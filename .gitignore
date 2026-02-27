@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.env
+
+# Joan config (contains API token — never commit)
+.joan/
+
+# Forgejo data volume
+forge/forgejo/
+
+# Claude Code local settings (personal permissions, not project-wide)
+.claude/settings.local.json
+
+# Editor
+.DS_Store

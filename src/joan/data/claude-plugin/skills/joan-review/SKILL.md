@@ -1,0 +1,238 @@
+---
+name: joan-review
+description: >-
+  Run the Joan code review cycle through the local Forgejo instance. This skill
+  should be used when the user wants to submit code for review, open a pull
+  request on Forgejo, check PR status or review feedback, address or resolve
+  reviewer comments, create a review branch, or push approved changes upstream.
+  Covers the full lifecycle: branch creation, PR creation, comment resolution,
+  and gated upstream push.
+---
+
+# Joan Review Workflow
+
+## Overview
+
+Joan gates all code through local Forgejo review before it reaches upstream (GitHub, GitLab, etc.). The cycle is:
+
+1. Create a review branch
+2. Open a PR on Forgejo
+3. Human reviews and leaves comments
+4. Agent addresses feedback and resolves comments
+5. Once approved with no unresolved comments, push upstream
+
+All Joan data commands (`pr sync`, `pr comments`) output structured JSON to stdout.
+
+## Determine Current State
+
+Before doing anything, figure out where you are in the review cycle:
+
+1. **Check config**: Verify `.joan/config.toml` exists. If not, tell the user to run setup first (invoke `/joan:joan-setup`).
+
+2. **Check current branch**:
+   ```
+   git rev-parse --abbrev-ref HEAD
+   ```
+   If on `main`, create a review branch (Sub-workflow A).
+
+3. **Check for existing PR**:
+   ```
+   uv run joan pr sync
+   ```
+   - If this succeeds with JSON output → there's an active PR. Check its state to decide between Sub-workflow B or C.
+   - If this fails with "No open PR found" → no PR exists yet. Go to Sub-workflow A.
+
+**Routing summary:**
+| State | Action |
+|-------|--------|
+| On `main`, no PR | Sub-workflow A: Submit New Work |
+| On branch, no PR | Create PR (step 3 of Sub-workflow A) |
+| PR exists, has unresolved comments or not approved | Sub-workflow B: Check & Address Feedback |
+| PR exists, approved, no unresolved comments | Sub-workflow C: Push Upstream |
+
+---
+
+## Sub-workflow A: Submit New Work
+
+Use this when starting fresh work that needs review.
+
+### 1. Create a review branch
+
+```
+uv run joan branch create [name]
+```
+
+If `[name]` is omitted, Joan generates one: `codex/work-YYYYMMDD-HHMMSS`. A descriptive name can be provided instead.
+
+Output:
+```
+Created and pushed branch: codex/work-20260227-143022
+```
+
+### 2. Stage and commit changes
+
+Stage and commit your work on this branch as usual with `git add` and `git commit`. If the work is already committed, skip this step.
+
+### 3. Create a PR
+
+```
+uv run joan pr create --title "Short description of changes" --body "Detailed explanation" --base main
+```
+
+- `--title` defaults to the branch name if omitted
+- `--body` is optional
+- `--base` defaults to `main`
+
+Output:
+```
+PR #4: http://localhost:3000/owner/repo/pulls/4
+```
+
+Tell the user the Forgejo URL so they can review the PR in the web UI.
+
+---
+
+## Sub-workflow B: Check & Address Feedback
+
+Use this when a PR exists and you need to check for or address review comments.
+
+### 1. Sync PR status
+
+```
+uv run joan pr sync
+```
+
+JSON output:
+```json
+{
+  "approved": false,
+  "unresolved_comments": 3,
+  "latest_review_state": "REQUESTED_CHANGES"
+}
+```
+
+Fields:
+- `approved`: `true` if any review granted approval
+- `unresolved_comments`: count of unresolved review comments
+- `latest_review_state`: `"APPROVED"`, `"REQUESTED_CHANGES"`, `"COMMENTED"`, or `null`
+
+If `approved` is `true` and `unresolved_comments` is `0`, skip to Sub-workflow C.
+
+### 2. Fetch unresolved comments
+
+```
+uv run joan pr comments
+```
+
+JSON output (array of unresolved comments):
+```json
+[
+  {
+    "id": 42,
+    "body": "This function should handle the error case",
+    "path": "src/handler.py",
+    "line": 15,
+    "resolved": false,
+    "author": "reviewer-username",
+    "created_at": "2026-02-27T10:00:00Z"
+  }
+]
+```
+
+Use `--all` to include already-resolved comments if you need full context.
+
+Fields:
+- `id`: comment ID (used to resolve it later)
+- `body`: the reviewer's feedback
+- `path`: file path the comment refers to
+- `line`: line number (can be `null` for PR-level comments)
+- `resolved`: always `false` in default output
+- `author`: who wrote the comment
+- `created_at`: ISO 8601 timestamp
+
+### 3. Address each comment
+
+For each unresolved comment:
+
+1. **Read** the file at `path` around `line` to understand the context
+2. **Make the requested change** — edit the code to address the feedback
+3. **Resolve the comment**:
+   ```
+   uv run joan pr comment resolve <id>
+   ```
+   Output: `Resolved comment <id>`
+
+Work through comments one at a time. This ensures each resolution is deliberate and traceable.
+
+**Important:** If a comment is a discussion or question (not an actionable code change), surface it to the user rather than auto-resolving it. Only resolve comments where you've made a concrete change.
+
+### 4. Commit and push
+
+After addressing all comments, commit the changes and push:
+```
+git add <changed-files>
+git commit -m "Address review feedback"
+git push joan-review HEAD  # joan-review is the git remote pointing to local Forgejo
+```
+
+### 5. Re-check status
+
+```
+uv run joan pr sync
+```
+
+Verify `unresolved_comments` is `0`. If there are still unresolved comments, repeat from step 2. If the reviewer hasn't re-approved yet, tell the user the PR is ready for another look.
+
+---
+
+## Sub-workflow C: Push Upstream
+
+Use this when the PR is approved and all comments are resolved.
+
+### 1. Verify readiness
+
+Run `uv run joan pr sync` and confirm:
+- `"approved": true`
+- `"unresolved_comments": 0`
+
+### 2. Push
+
+```
+uv run joan pr push
+```
+
+This command enforces approval gates internally. If the PR is not approved or has unresolved comments, it exits with code 1 and an error message:
+- `PR is not approved on Forgejo.`
+- `PR has N unresolved comments.`
+
+On success:
+```
+Pushed codex/work-20260227-143022 to origin
+```
+
+The branch is now on the upstream remote.
+
+---
+
+## Rules
+
+1. **Never push to `origin` directly.** All upstream pushes go through `uv run joan pr push`, which enforces approval gates.
+2. **Always use `uv run joan`**, not bare `joan`. Joan is managed by `uv` and may not be on PATH.
+3. **Resolve comments one at a time** as you address each one, not in bulk at the end.
+4. **Discussion comments go to the user.** If a comment is a question or discussion point (not an actionable change request), surface it to the user and let them decide how to handle it. Do not auto-resolve.
+5. **Check state before acting.** Always run `uv run joan pr sync` to understand where you are before starting work.
+
+---
+
+## Quick Reference
+
+| Command | Purpose | Output |
+|---------|---------|--------|
+| `uv run joan branch create [name]` | Create review branch | `Created and pushed branch: {name}` |
+| `uv run joan pr create --title "..." --body "..." --base main` | Open PR on Forgejo | `PR #N: {url}` |
+| `uv run joan pr sync` | Check approval & comment status | JSON: `{approved, unresolved_comments, latest_review_state}` |
+| `uv run joan pr comments` | List unresolved comments | JSON array of comment objects |
+| `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
+| `uv run joan pr comment resolve <id>` | Mark comment as resolved | `Resolved comment <id>` |
+| `uv run joan pr push` | Push approved branch upstream | `Pushed {branch} to origin` |
+| `git push joan-review HEAD` | Push new commits for re-review | Standard git output |

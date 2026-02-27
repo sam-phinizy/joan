@@ -1,0 +1,137 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import httpx
+import pytest
+
+from joan.shell.forgejo_client import ForgejoClient, ForgejoError
+
+
+@dataclass
+class DummyCtxClient:
+    response: httpx.Response
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def post(self, _url, json):
+        self.post_payload = json
+        return self.response
+
+    def request(self, _method, _url, **_kwargs):
+        return self.response
+
+
+def make_response(status: int, body: str = "", json_data: object | None = None) -> httpx.Response:
+    req = httpx.Request("GET", "http://forgejo.local/api")
+    if json_data is not None:
+        return httpx.Response(status, request=req, json=json_data)
+    return httpx.Response(status, request=req, text=body)
+
+
+def test_headers_include_token() -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    assert client._headers()["Authorization"] == "token abc"
+
+
+def test_create_token_prefers_sha1(monkeypatch) -> None:
+    response = make_response(200, json_data={"sha1": "tok"})
+    holder: dict[str, object] = {}
+
+    def fake_client(*_args, **_kwargs):
+        c = DummyCtxClient(response)
+        holder["client"] = c
+        return c
+
+    monkeypatch.setattr(httpx, "Client", fake_client)
+
+    client = ForgejoClient("http://forgejo.local")
+    assert client.create_token("user", "pw", "name") == "tok"
+    assert holder["client"].post_payload["scopes"] == ["all"]
+
+
+def test_create_token_fallback_and_missing(monkeypatch) -> None:
+    token_response = make_response(200, json_data={"token": "tok2"})
+    monkeypatch.setattr(httpx, "Client", lambda *args, **kwargs: DummyCtxClient(token_response))
+
+    client = ForgejoClient("http://forgejo.local")
+    assert client.create_token("user", "pw", "name") == "tok2"
+
+    missing_response = make_response(200, json_data={})
+    monkeypatch.setattr(httpx, "Client", lambda *args, **kwargs: DummyCtxClient(missing_response))
+    with pytest.raises(ForgejoError, match="did not include token"):
+        client.create_token("user", "pw", "name")
+
+
+def test_create_repo_and_list_pulls(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if path.endswith("/pulls"):
+            return [{"number": 1}]
+        return {"id": 1}
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    assert client.create_repo("repo") == {"id": 1}
+    assert client.list_pulls("sam", "joan", head="sam:branch") == [{"number": 1}]
+
+    assert calls[0][0] == "POST"
+    assert calls[0][1] == "/api/v1/user/repos"
+    assert calls[1][2]["params"]["head"] == "sam:branch"
+
+
+def test_resolve_comment_primary_success(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+
+    def fake_request_json(method, path, **kwargs):
+        assert method == "POST"
+        assert path.endswith("/resolve")
+        return {}
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+    monkeypatch.setattr(client, "_request_raw", lambda *_a, **_kw: pytest.fail("fallback should not run"))
+
+    client.resolve_comment("sam", "joan", 1, 9)
+
+
+def test_resolve_comment_uses_fallback_on_primary_error(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+
+    def fail_primary(*_args, **_kwargs):
+        raise ForgejoError("no endpoint")
+
+    fallback_resp = make_response(200, json_data={"ok": True})
+    fallback_calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_raw(method, path, **kwargs):
+        fallback_calls.append((method, path, kwargs))
+        return fallback_resp
+
+    monkeypatch.setattr(client, "_request_json", fail_primary)
+    monkeypatch.setattr(client, "_request_raw", fake_request_raw)
+
+    client.resolve_comment("sam", "joan", 1, 9)
+    assert fallback_calls[0][0] == "PATCH"
+    assert fallback_calls[0][1].endswith("/pulls/comments/9")
+    assert fallback_calls[0][2]["json"] == {"resolved": True}
+
+
+def test_raise_for_status_truncates_long_body() -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    long_body = "x" * 300
+    response = make_response(500, body=long_body)
+
+    with pytest.raises(ForgejoError) as exc:
+        client._raise_for_status(response)
+
+    message = str(exc.value)
+    assert "500" in message
+    assert "..." in message
+    assert len(message) < 280
