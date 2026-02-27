@@ -26,27 +26,68 @@ def test_root_cli_has_expected_commands() -> None:
 def test_pr_create(monkeypatch, sample_config) -> None:
     runner = CliRunner()
     calls: list[list[str]] = []
+    captured: dict[str, object] = {}
 
     class FakeClient:
-        def create_pr(self, _owner, _repo, _payload):
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
             return {
                 "number": 4,
                 "title": "t",
                 "html_url": "http://forgejo.local/pr/4",
                 "state": "open",
                 "head": {"ref": "feat"},
-                "base": {"ref": "main"},
+                "base": {"ref": "joan/feat"},
             }
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
     monkeypatch.setattr(pr_mod, "current_branch", lambda: "feat")
-    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    def fake_run_git(args):
+        calls.append(args)
+        if args == ["show-ref", "--verify", "--quiet", "refs/remotes/origin/feat"]:
+            return ""
+        return ""
+
+    monkeypatch.setattr(pr_mod, "run_git", fake_run_git)
 
     result = runner.invoke(pr_mod.app, ["create"])
     assert result.exit_code == 0
+    assert ["push", "joan-review", "refs/remotes/origin/feat:refs/heads/joan/feat"] in calls
     assert ["push", "-u", "joan-review", "feat"] in calls
+    assert captured["payload"] == {"title": "feat", "head": "feat", "base": "joan/feat"}
     assert "PR #4" in result.output
+
+
+def test_pr_create_on_main_prompts_for_branch(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
+            return {
+                "number": 5,
+                "title": "feat/new",
+                "html_url": "http://forgejo.local/pr/5",
+                "state": "open",
+                "head": {"ref": "feat/new"},
+                "base": {"ref": "joan/main"},
+            }
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "main")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    result = runner.invoke(pr_mod.app, ["create"], input="feat/new\n")
+    assert result.exit_code == 0
+    assert ["checkout", "-b", "feat/new"] in calls
+    assert ["push", "joan-review", "refs/remotes/origin/main:refs/heads/joan/main"] in calls
+    assert ["push", "-u", "joan-review", "feat/new"] in calls
+    assert captured["payload"] == {"title": "feat/new", "head": "feat/new", "base": "joan/main"}
 
 
 def test_pr_sync(monkeypatch, sample_config, sample_pr) -> None:

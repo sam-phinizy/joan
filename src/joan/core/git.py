@@ -15,6 +15,10 @@ def push_branch_args(remote: str, branch: str, set_upstream: bool = True) -> lis
     return args
 
 
+def push_refspec_args(remote: str, src_ref: str, dst_ref: str) -> list[str]:
+    return ["push", remote, f"{src_ref}:{dst_ref}"]
+
+
 def current_branch_args() -> list[str]:
     return ["rev-parse", "--abbrev-ref", "HEAD"]
 

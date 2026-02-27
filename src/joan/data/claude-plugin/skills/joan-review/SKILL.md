@@ -33,7 +33,7 @@ Before doing anything, figure out where you are in the review cycle:
    ```
    git rev-parse --abbrev-ref HEAD
    ```
-   If on `main`, create a review branch (Sub-workflow A).
+   If on `main`, ask the user for a new branch name, then create that branch before continuing.
 
 3. **Check for existing PR**:
    ```
@@ -45,7 +45,7 @@ Before doing anything, figure out where you are in the review cycle:
 **Routing summary:**
 | State | Action |
 |-------|--------|
-| On `main`, no PR | Sub-workflow A: Submit New Work |
+| On `main`, no PR | Sub-workflow A: Submit New Work (prompt for branch name first) |
 | On branch, no PR | Create PR (step 3 of Sub-workflow A) |
 | PR exists, has unresolved comments or not approved | Sub-workflow B: Check & Address Feedback |
 | PR exists, approved, no unresolved comments | Sub-workflow C: Push Upstream |
@@ -76,12 +76,13 @@ Stage and commit your work on this branch as usual with `git add` and `git commi
 ### 3. Create a PR
 
 ```
-uv run joan pr create --title "Short description of changes" --body "Detailed explanation" --base main
+uv run joan pr create --title "Short description of changes" --body "Detailed explanation"
 ```
 
 - `--title` defaults to the branch name if omitted
 - `--body` is optional
-- `--base` defaults to `main`
+- `--base` defaults to `joan/<original-branch>`
+- If run from `main`, `joan pr create` prompts for a new working branch name and checks it out first
 
 Output:
 ```
@@ -229,7 +230,7 @@ The branch is now on the upstream remote.
 | Command | Purpose | Output |
 |---------|---------|--------|
 | `uv run joan branch create [name]` | Create review branch | `Created and pushed branch: {name}` |
-| `uv run joan pr create --title "..." --body "..." --base main` | Open PR on Forgejo | `PR #N: {url}` |
+| `uv run joan pr create --title "..." --body "..."` | Open PR on Forgejo | `PR #N: {url}` |
 | `uv run joan pr sync` | Check approval & comment status | JSON: `{approved, unresolved_comments, latest_review_state}` |
 | `uv run joan pr comments` | List unresolved comments | JSON array of comment objects |
 | `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |

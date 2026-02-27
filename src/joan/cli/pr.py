@@ -13,7 +13,7 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import push_branch_args
+from joan.core.git import create_branch_args, push_branch_args, push_refspec_args
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Manage pull requests on Forgejo.")
@@ -25,15 +25,33 @@ app.add_typer(comment_app, name="comment")
 def pr_create(
     title: str | None = typer.Option(default=None, help="PR title"),
     body: str | None = typer.Option(default=None, help="PR body"),
-    base: str = typer.Option(default="main", help="Base branch"),
+    base: str | None = typer.Option(default=None, help="Base branch (defaults to joan/<original branch>)"),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
 
-    branch = current_branch()
+    original_branch = current_branch()
+    branch = original_branch
+    if branch == "main":
+        branch = typer.prompt("Current branch is 'main'. Enter a new branch name").strip()
+        if not branch:
+            typer.echo("Branch name is required.", err=True)
+            raise typer.Exit(code=2)
+        run_git(create_branch_args(branch))
+
+    resolved_base = base or f"joan/{original_branch}"
+    if base is None:
+        upstream_ref = f"refs/remotes/{config.remotes.upstream}/{original_branch}"
+        source_ref = upstream_ref
+        try:
+            run_git(["show-ref", "--verify", "--quiet", upstream_ref])
+        except Exception:  # noqa: BLE001
+            source_ref = f"refs/heads/{original_branch}"
+        run_git(push_refspec_args(config.remotes.review, source_ref, f"refs/heads/{resolved_base}"))
+
     run_git(push_branch_args(config.remotes.review, branch, set_upstream=True))
 
-    payload = build_create_pr_payload(title=title or branch, head=branch, base=base, body=body)
+    payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=body)
     pr_raw = client.create_pr(config.forgejo.owner, config.forgejo.repo, payload)
     pr = parse_pr_response(pr_raw)
     typer.echo(f"PR #{pr.number}: {pr.url}")
