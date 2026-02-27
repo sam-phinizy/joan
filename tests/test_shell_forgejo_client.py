@@ -147,6 +147,62 @@ def test_resolve_comment_uses_fallback_on_primary_error(monkeypatch) -> None:
     assert fallback_calls[0][2]["json"] == {"resolved": True}
 
 
+def test_create_user_via_admin(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_client_cls(*args, **kwargs):
+        class C:
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                return False
+            def post(self, url, json):
+                calls.append(("POST", url, json))
+                return make_response(201, json_data={"id": 5, "login": "joan"})
+        return C()
+
+    monkeypatch.setattr(httpx, "Client", fake_client_cls)
+
+    result = client.create_user(
+        admin_username="admin",
+        admin_password="adminpw",
+        username="joan",
+        email="joan@localhost",
+        password="secret",
+    )
+
+    assert result["login"] == "joan"
+    assert len(calls) == 1
+    assert calls[0][1].endswith("/api/v1/admin/users")
+    assert calls[0][2]["username"] == "joan"
+    assert calls[0][2]["must_change_password"] is False
+
+
+def test_create_token_with_admin_auth(monkeypatch) -> None:
+    holder: dict[str, object] = {}
+
+    def fake_client_cls(*args, auth=None, **kwargs):
+        holder["auth"] = auth
+
+        class C:
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                return False
+            def post(self, _url, json):
+                return make_response(200, json_data={"sha1": "joan-tok"})
+        return C()
+
+    monkeypatch.setattr(httpx, "Client", fake_client_cls)
+
+    client = ForgejoClient("http://forgejo.local")
+    token = client.create_token("joan", "adminpw", "my-token", auth_username="admin")
+
+    assert token == "joan-tok"
+    assert holder["auth"] == ("admin", "adminpw")
+
+
 def test_raise_for_status_truncates_long_body() -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
     long_body = "x" * 300

@@ -20,19 +20,60 @@ def make_config() -> Config:
 def test_init_command(monkeypatch) -> None:
     runner = CliRunner()
 
+    # New prompts: url, admin_username, admin_password, repo (no owner prompt)
     prompts = iter([
         "http://forgejo.local",
         "sam",
         "secret",
-        "sam",
-        "joan",
+        "my-project",
     ])
 
     monkeypatch.setattr(init_mod.typer, "prompt", lambda *_args, **_kwargs: next(prompts))
 
+    written_configs: list = []
+
     class FakeForgejoClient:
         def __init__(self, _url):
             pass
+
+        def create_user(self, **_kwargs):
+            return {"id": 1, "login": "joan"}
+
+        def create_token(self, **_kwargs):
+            return "token-abc"
+
+    monkeypatch.setattr(init_mod, "ForgejoClient", FakeForgejoClient)
+    monkeypatch.setattr(init_mod, "write_config", lambda cfg, _cwd: written_configs.append(cfg) or Path(".joan/config.toml"))
+
+    result = runner.invoke(init_mod.app, [])
+
+    assert result.exit_code == 0, result.output
+    assert "Wrote config" in result.output
+    assert "Next step" in result.output
+    assert len(written_configs) == 1
+    assert written_configs[0].forgejo.owner == "joan"
+
+
+def test_init_command_reuses_existing_joan_user(monkeypatch) -> None:
+    runner = CliRunner()
+
+    prompts = iter([
+        "http://forgejo.local",
+        "sam",
+        "secret",
+        "my-project",
+    ])
+
+    monkeypatch.setattr(init_mod.typer, "prompt", lambda *_args, **_kwargs: next(prompts))
+
+    from joan.shell.forgejo_client import ForgejoError
+
+    class FakeForgejoClient:
+        def __init__(self, _url):
+            pass
+
+        def create_user(self, **_kwargs):
+            raise ForgejoError("user already exists")
 
         def create_token(self, **_kwargs):
             return "token-abc"
@@ -42,9 +83,8 @@ def test_init_command(monkeypatch) -> None:
 
     result = runner.invoke(init_mod.app, [])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "Wrote config" in result.output
-    assert "Next step" in result.output
 
 
 def test_branch_create_with_generated_name(monkeypatch) -> None:

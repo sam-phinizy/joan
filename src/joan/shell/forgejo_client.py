@@ -26,10 +26,12 @@ class ForgejoClient:
         password: str,
         token_name: str,
         scopes: list[str] | None = None,
+        auth_username: str | None = None,
     ) -> str:
         url = f"{self.base_url}/api/v1/users/{username}/tokens"
         payload = {"name": token_name, "scopes": scopes or ["all"]}
-        with httpx.Client(timeout=30.0, auth=(username, password)) as client:
+        auth = (auth_username if auth_username is not None else username, password)
+        with httpx.Client(timeout=30.0, auth=auth) as client:
             response = client.post(url, json=payload)
         self._raise_for_status(response)
         data = response.json()
@@ -37,6 +39,29 @@ class ForgejoClient:
         if not token:
             raise ForgejoError("Forgejo token response did not include token value")
         return str(token)
+
+    def create_user(
+        self,
+        admin_username: str,
+        admin_password: str,
+        username: str,
+        email: str,
+        password: str,
+    ) -> dict[str, Any]:
+        url = f"{self.base_url}/api/v1/admin/users"
+        payload = {
+            "email": email,
+            "login_name": username,
+            "must_change_password": False,
+            "password": password,
+            "send_notify": False,
+            "source_id": 0,
+            "username": username,
+        }
+        with httpx.Client(timeout=30.0, auth=(admin_username, admin_password)) as client:
+            response = client.post(url, json=payload)
+        self._raise_for_status(response)
+        return response.json()
 
     def create_repo(self, name: str, private: bool = True) -> dict[str, Any]:
         return self._request_json("POST", "/api/v1/user/repos", json={"name": name, "private": private})
