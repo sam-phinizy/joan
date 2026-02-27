@@ -21,13 +21,21 @@ Joan enforces approval gates: `joan pr push` refuses to push if the PR is not ap
 
 ### Install Joan
 
-Add Joan to your project with `uv`:
+**Global install** (makes `joan` available on your PATH):
+
+```bash
+uv tool install git+https://github.com/sam-phinizy/joan.git
+```
+
+After a global install, use `joan` directly instead of `uv run joan` everywhere in this guide.
+
+**Project dependency** (pinned to a specific project):
 
 ```bash
 uv add git+https://github.com/sam-phinizy/joan.git
 ```
 
-Or run it directly without installing (no project dependency needed):
+**One-shot** (no install required):
 
 ```bash
 uvx --from git+https://github.com/sam-phinizy/joan.git joan --help
@@ -48,7 +56,7 @@ uv run joan skills install --agent codex
 uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --agent codex
 ```
 
-- Claude install target: `.claude/plugins/joan/`
+- Claude install target: `.claude/skills/` (skills are placed directly alongside other Claude skills)
 - Codex install target: `$CODEX_HOME/skills/joan/` (defaults to `~/.codex/skills/joan/`)
 
 ### Start Forgejo
