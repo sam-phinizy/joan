@@ -76,6 +76,25 @@ def test_skills_install_codex_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert (dest / "joan-setup" / "SKILL.md").exists()
 
 
+def test_skills_install_removes_legacy_plugin_dir(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    monkeypatch.chdir(tmp_path)
+
+    # Simulate a legacy install at .claude/plugins/joan/
+    legacy = tmp_path / ".claude" / "plugins" / "joan"
+    legacy.mkdir(parents=True)
+    (legacy / "plugin.json").write_text("{}")
+    (legacy / "skills").mkdir()
+    (legacy / "skills" / "joan-setup").mkdir()
+
+    result = runner.invoke(skills_mod.app, ["--agent", "claude"])
+
+    assert result.exit_code == 0, result.output
+    assert not legacy.exists(), "legacy plugin dir should be removed"
+    assert "legacy" in result.output.lower()
+    assert (tmp_path / ".claude" / "skills" / "joan-setup" / "SKILL.md").exists()
+
+
 def test_skills_install_unknown_agent(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     monkeypatch.chdir(tmp_path)

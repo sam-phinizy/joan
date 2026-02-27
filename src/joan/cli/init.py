@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 
 from joan.core.models import Config, ForgejoConfig, RemotesConfig
-from joan.shell.config_io import write_config
+from joan.shell.config_io import read_config, write_config
 from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 
 app = typer.Typer(help="Initialize Joan in the current repository.")
@@ -21,8 +21,20 @@ def _generate_password(length: int = 32) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+def _check_legacy_config() -> None:
+    try:
+        existing = read_config(Path.cwd())
+    except FileNotFoundError:
+        return
+    if existing.forgejo.owner != _JOAN_USERNAME:
+        typer.echo(
+            f"Migrating existing config: owner '{existing.forgejo.owner}' -> '{_JOAN_USERNAME}'."
+        )
+
+
 @app.command("init")
 def init_command() -> None:
+    _check_legacy_config()
     default_url = "http://localhost:3000"
     forgejo_url = typer.prompt("Forgejo URL", default=default_url).strip().rstrip("/")
     admin_username = typer.prompt("Forgejo admin username").strip()

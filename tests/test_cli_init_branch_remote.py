@@ -87,6 +87,46 @@ def test_init_command_reuses_existing_joan_user(monkeypatch) -> None:
     assert "Wrote config" in result.output
 
 
+def test_init_warns_on_legacy_owner_config(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    monkeypatch.chdir(tmp_path)
+
+    # Write a legacy config with owner != "joan"
+    legacy_config = tmp_path / ".joan" / "config.toml"
+    legacy_config.parent.mkdir(parents=True)
+    legacy_config.write_text(
+        '[forgejo]\nurl = "http://forgejo.local"\ntoken = "oldtok"\nowner = "sam"\nrepo = "myrepo"\n'
+    )
+
+    prompts = iter([
+        "http://forgejo.local",
+        "sam",
+        "secret",
+        "my-project",
+    ])
+    monkeypatch.setattr(init_mod.typer, "prompt", lambda *_args, **_kwargs: next(prompts))
+
+    class FakeForgejoClient:
+        def __init__(self, _url):
+            pass
+
+        def create_user(self, **_kwargs):
+            return {"id": 1, "login": "joan"}
+
+        def create_token(self, **_kwargs):
+            return "token-abc"
+
+    monkeypatch.setattr(init_mod, "ForgejoClient", FakeForgejoClient)
+
+    result = runner.invoke(init_mod.app, [])
+
+    assert result.exit_code == 0, result.output
+    assert "migrat" in result.output.lower()
+    # Config should now use joan as owner
+    written = legacy_config.read_text()
+    assert 'owner = "joan"' in written
+
+
 def test_branch_create_with_generated_name(monkeypatch) -> None:
     runner = CliRunner()
     calls: list[list[str]] = []

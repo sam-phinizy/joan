@@ -39,6 +39,11 @@ def skills_install(
     dest = _install_dest(agent)
 
     if agent == "claude":
+        legacy = Path.cwd() / ".claude" / "plugins" / "joan"
+        if legacy.exists():
+            shutil.rmtree(legacy)
+            typer.echo(f"Removed legacy plugin install at {legacy}.")
+
         skill_names = [s.name for s in src.iterdir() if s.is_dir()]
         if any((dest / name).exists() for name in skill_names):
             typer.echo(f"Existing install found at {dest}. Reinstalling...")
