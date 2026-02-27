@@ -42,6 +42,40 @@ def test_skills_install_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert (dest / "plugin.json").exists()
 
 
+def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    codex_home = tmp_path / ".codex-home"
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    result = runner.invoke(skills_mod.app, ["--agent", "codex"])
+
+    assert result.exit_code == 0, result.output
+    dest = codex_home / "skills" / "joan"
+    assert dest.is_dir()
+    assert (dest / "joan-setup" / "SKILL.md").exists()
+    assert (dest / "joan-review" / "SKILL.md").exists()
+    assert "Installed joan skills for codex" in result.output
+
+
+def test_skills_install_codex_reinstall(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    codex_home = tmp_path / ".codex-home"
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    runner.invoke(skills_mod.app, ["--agent", "codex"])
+
+    dest = codex_home / "skills" / "joan"
+    sentinel = dest / "stale_file.txt"
+    sentinel.write_text("old")
+
+    result = runner.invoke(skills_mod.app, ["--agent", "codex"])
+
+    assert result.exit_code == 0, result.output
+    assert "Reinstalling" in result.output
+    assert not sentinel.exists()
+    assert (dest / "joan-setup" / "SKILL.md").exists()
+
+
 def test_skills_install_unknown_agent(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     monkeypatch.chdir(tmp_path)
