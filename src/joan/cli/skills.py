@@ -10,30 +10,17 @@ app = typer.Typer(help="Manage Joan skills and agent plugins.")
 
 _SUPPORTED_AGENTS = {"claude", "codex"}
 
-_AGENT_SOURCE_DIR = {
-    "claude": "claude-plugin",
-    "codex": "codex-skills",
-}
-
-
 def _install_dest(agent: str) -> Path:
     if agent == "claude":
-        return Path.cwd() / ".claude" / "plugins" / "joan"
+        return Path.cwd() / ".claude" / "skills"
     codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     return codex_home / "skills" / "joan"
 
 
 def _source_for(agent: str) -> Path:
-    return Path(__file__).parent.parent / "data" / _AGENT_SOURCE_DIR[agent]
-
-
-def _normalize_claude_layout(dest: Path) -> None:
-    meta_dir = dest / ".claude-plugin"
-    if not meta_dir.is_dir():
-        return
-    for entry in meta_dir.iterdir():
-        shutil.move(str(entry), str(dest / entry.name))
-    shutil.rmtree(meta_dir)
+    if agent == "claude":
+        return Path(__file__).parent.parent / "data" / "claude-plugin" / "skills"
+    return Path(__file__).parent.parent / "data" / "codex-skills"
 
 
 @app.command("install")
@@ -51,15 +38,23 @@ def skills_install(
 
     dest = _install_dest(agent)
 
-    if dest.exists():
-        typer.echo(f"Existing install found at {dest}. Reinstalling...")
-        shutil.rmtree(dest)
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(src, dest)
     if agent == "claude":
-        _normalize_claude_layout(dest)
-    if agent == "claude":
-        typer.echo(f"Installed joan plugin for {agent} at {dest}")
+        skill_names = [s.name for s in src.iterdir() if s.is_dir()]
+        if any((dest / name).exists() for name in skill_names):
+            typer.echo(f"Existing install found at {dest}. Reinstalling...")
+            for name in skill_names:
+                skill_dest = dest / name
+                if skill_dest.exists():
+                    shutil.rmtree(skill_dest)
+        dest.mkdir(parents=True, exist_ok=True)
+        for skill_dir in src.iterdir():
+            if skill_dir.is_dir():
+                shutil.copytree(skill_dir, dest / skill_dir.name)
     else:
-        typer.echo(f"Installed joan skills for {agent} at {dest}")
+        if dest.exists():
+            typer.echo(f"Existing install found at {dest}. Reinstalling...")
+            shutil.rmtree(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dest)
+
+    typer.echo(f"Installed joan skills for {agent} at {dest}")

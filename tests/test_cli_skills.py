@@ -15,12 +15,12 @@ def test_skills_install_claude(tmp_path: Path, monkeypatch) -> None:
     result = runner.invoke(skills_mod.app, ["--agent", "claude"])
 
     assert result.exit_code == 0, result.output
-    dest = tmp_path / ".claude" / "plugins" / "joan"
+    dest = tmp_path / ".claude" / "skills"
     assert dest.is_dir()
-    assert (dest / "plugin.json").exists()
-    assert (dest / "skills" / "joan-setup" / "SKILL.md").exists()
-    assert (dest / "skills" / "joan-review" / "SKILL.md").exists()
-    assert "Installed joan plugin for claude" in result.output
+    assert not (dest / "plugin.json").exists()
+    assert (dest / "joan-setup" / "SKILL.md").exists()
+    assert (dest / "joan-review" / "SKILL.md").exists()
+    assert "Installed joan skills for claude" in result.output
 
 
 def test_skills_install_reinstall(tmp_path: Path, monkeypatch) -> None:
@@ -29,9 +29,9 @@ def test_skills_install_reinstall(tmp_path: Path, monkeypatch) -> None:
 
     runner.invoke(skills_mod.app, ["--agent", "claude"])
 
-    # Place a sentinel file to confirm it gets wiped on reinstall
-    dest = tmp_path / ".claude" / "plugins" / "joan"
-    sentinel = dest / "stale_file.txt"
+    # Place a sentinel file inside a skill dir to confirm it gets wiped on reinstall
+    dest = tmp_path / ".claude" / "skills"
+    sentinel = dest / "joan-setup" / "stale_file.txt"
     sentinel.write_text("old")
 
     result = runner.invoke(skills_mod.app, ["--agent", "claude"])
@@ -39,7 +39,7 @@ def test_skills_install_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert "Reinstalling" in result.output
     assert not sentinel.exists()
-    assert (dest / "plugin.json").exists()
+    assert (dest / "joan-setup" / "SKILL.md").exists()
 
 
 def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
