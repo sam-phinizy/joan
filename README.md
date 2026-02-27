@@ -95,7 +95,21 @@ You will be prompted for:
 
 This creates an API token on Forgejo and writes `.joan/config.toml`. Add `.joan/` to your `.gitignore` — the config contains an API token and must never be committed.
 
-**2. Add the review remote**
+**2. Set up SSH key for Forgejo (recommended)**
+
+```bash
+uv run joan ssh setup
+```
+
+Generates `~/.ssh/id_ed25519_joan` if needed and uploads the public key to your Forgejo account.
+
+Use `--key-path` to choose a different key location:
+
+```bash
+uv run joan ssh setup --key-path ~/.ssh/id_ed25519_joan_work
+```
+
+**3. Add the review remote**
 
 ```bash
 uv run joan remote add
@@ -144,6 +158,7 @@ upstream = "origin"      # default
 | Command | Description |
 |---------|-------------|
 | `joan init` | One-time setup: create token, write config |
+| `joan ssh setup [--key-path PATH] [--title TEXT]` | Create/reuse an SSH keypair and upload key to Forgejo |
 | `joan remote add` | Create Forgejo repo, add `joan-review` remote |
 | `joan branch create [name]` | Create and push a review branch |
 | `joan pr create` | Open a PR on Forgejo |

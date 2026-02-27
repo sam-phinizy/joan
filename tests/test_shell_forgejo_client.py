@@ -87,6 +87,30 @@ def test_create_repo_and_list_pulls(monkeypatch) -> None:
     assert calls[1][2]["params"]["head"] == "sam:branch"
 
 
+def test_list_and_create_ssh_keys(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if method == "GET":
+            return [{"id": 1, "key": "ssh-ed25519 AAA"}]
+        return {"id": 2}
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    keys = client.list_ssh_keys()
+    created = client.create_ssh_key("joan-test", "ssh-ed25519 BBB")
+
+    assert keys[0]["id"] == 1
+    assert created["id"] == 2
+    assert calls[0][0] == "GET"
+    assert calls[0][1] == "/api/v1/user/keys"
+    assert calls[1][0] == "POST"
+    assert calls[1][1] == "/api/v1/user/keys"
+    assert calls[1][2]["json"]["title"] == "joan-test"
+
+
 def test_resolve_comment_primary_success(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
 

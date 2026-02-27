@@ -19,6 +19,7 @@ def test_root_cli_has_expected_commands() -> None:
     assert "remote" in result.output
     assert "branch" in result.output
     assert "pr" in result.output
+    assert "ssh" in result.output
     assert "worktree" in result.output
 
 
