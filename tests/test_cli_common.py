@@ -5,6 +5,7 @@ import typer
 
 import joan.cli._common as common
 from joan.core.models import PullRequest
+from joan.shell.forgejo_client import ForgejoError
 
 
 def test_load_config_or_exit_missing(monkeypatch) -> None:
@@ -68,6 +69,21 @@ def test_current_pr_or_exit_returns_pull(monkeypatch, sample_config) -> None:
     pr = common.current_pr_or_exit(sample_config)
     assert isinstance(pr, PullRequest)
     assert pr.number == 5
+
+
+def test_current_pr_or_exit_404_guidance(monkeypatch, sample_config, capsys) -> None:
+    monkeypatch.setattr(common, "current_branch", lambda: "feature")
+
+    class FakeClient:
+        def list_pulls(self, *_args, **_kwargs):
+            raise ForgejoError("Forgejo API 404: not found")
+
+    monkeypatch.setattr(common, "forgejo_client", lambda _cfg: FakeClient())
+
+    with pytest.raises(typer.Exit) as exc:
+        common.current_pr_or_exit(sample_config)
+    assert exc.value.exit_code == 2
+    assert "repo not found or token cannot access it" in capsys.readouterr().err.lower()
 
 
 def test_print_json(capsys) -> None:

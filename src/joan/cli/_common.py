@@ -8,7 +8,7 @@ import typer
 from joan.core.forgejo import parse_pr_response
 from joan.core.models import Config, PullRequest
 from joan.shell.config_io import read_config
-from joan.shell.forgejo_client import ForgejoClient
+from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 from joan.shell.git_runner import run_git
 
 
@@ -38,7 +38,19 @@ def current_branch() -> str:
 def current_pr_or_exit(config: Config) -> PullRequest:
     branch = current_branch()
     client = forgejo_client(config)
-    pulls = client.list_pulls(config.forgejo.owner, config.forgejo.repo, head=f"{config.forgejo.owner}:{branch}")
+    try:
+        pulls = client.list_pulls(config.forgejo.owner, config.forgejo.repo, head=f"{config.forgejo.owner}:{branch}")
+    except ForgejoError as exc:
+        if "Forgejo API 404" in str(exc):
+            typer.echo(
+                "Forgejo repo not found or token cannot access it. "
+                f"Check .joan/config.toml owner/repo ('{config.forgejo.owner}/{config.forgejo.repo}') "
+                "and run `uv run joan remote add` if needed.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        typer.echo(f"Forgejo request failed: {exc}", err=True)
+        raise typer.Exit(code=2)
     if not pulls:
         typer.echo(f"No open PR found for branch '{branch}'.", err=True)
         raise typer.Exit(code=1)
