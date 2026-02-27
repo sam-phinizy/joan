@@ -17,6 +17,19 @@ Joan enforces approval gates: `joan pr push` refuses to push if the PR is not ap
 - Docker (for the local Forgejo instance)
 - A git repository
 
+## Install from GitHub (uvx)
+
+If you want to run Joan directly from GitHub without installing it into your project:
+
+```bash
+# Run any Joan command from the latest main branch
+uvx --from git+https://github.com/sam-phinizy/joan.git joan --help
+
+# Example setup commands
+uvx --from git+https://github.com/sam-phinizy/joan.git joan init
+uvx --from git+https://github.com/sam-phinizy/joan.git joan remote add
+```
+
 ## Setup
 
 **1. Start Forgejo**

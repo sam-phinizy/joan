@@ -1,0 +1,6 @@
+{
+  "name": "joan",
+  "version": "0.1.0",
+  "description": "Local code review gate for AI agents via Forgejo. Agents push work to a local Forgejo instance, a human reviews it, and only approved work gets pushed to the real upstream.",
+  "keywords": ["code-review", "forgejo", "git", "workflow"]
+}
