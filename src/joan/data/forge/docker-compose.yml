@@ -1,0 +1,76 @@
+networks:
+  forgejo:
+    external: false
+
+services:
+  server:
+    image: codeberg.org/forgejo/forgejo:14
+    container_name: forgejo
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__security__INSTALL_LOCK=true
+      - FORGEJO__service__DISABLE_REGISTRATION=true
+    restart: always
+    networks:
+      - forgejo
+    volumes:
+      - ./forgejo:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - '3000:3000'
+      - '222:22'
+
+  admin-init:
+    image: codeberg.org/forgejo/forgejo:14
+    depends_on:
+      - server
+    restart: "no"
+    user: "1000:1000"
+    networks:
+      - forgejo
+    environment:
+      - FORGE_ADMIN_USERNAME=${FORGE_ADMIN_USERNAME:-${USER:-forgeadmin}}
+      - FORGE_ADMIN_PASSWORD=${FORGE_ADMIN_PASSWORD:?Set FORGE_ADMIN_PASSWORD}
+      - FORGE_ADMIN_EMAIL=${FORGE_ADMIN_EMAIL:-admin@example.com}
+    volumes:
+      - ./forgejo:/data
+      - /etc/localtime:/etc/localtime:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      '
+      i=0;
+      until /usr/local/bin/gitea --help >/dev/null 2>&1 && [ -f /data/gitea/conf/app.ini ]; do
+        i=$$((i+1));
+        if [ "$$i" -ge 30 ]; then
+          echo "Forgejo init timeout waiting for /data/gitea/conf/app.ini";
+          exit 1;
+        fi;
+        sleep 2;
+      done;
+      j=0;
+      until /usr/local/bin/gitea admin user list --admin >/tmp/admin-list.txt 2>/tmp/admin-list.err; do
+        j=$$((j+1));
+        if [ "$$j" -ge 60 ]; then
+          echo "Forgejo DB not ready for admin commands after 120 seconds.";
+          cat /tmp/admin-list.err;
+          exit 1;
+        fi;
+        sleep 2;
+      done;
+      if tail -n +2 /tmp/admin-list.txt | grep -q "[^[:space:]]"; then
+        echo "At least one admin user already exists; skipping.";
+        exit 0;
+      fi;
+      CREATE_USER="$${FORGE_ADMIN_USERNAME}";
+      if [ "$$CREATE_USER" = "admin" ]; then
+        CREATE_USER="forgeadmin";
+        echo "Username 'admin' is reserved by Forgejo; using '$$CREATE_USER' instead.";
+      fi;
+      /usr/local/bin/gitea admin user create \
+        --username "$$CREATE_USER" \
+        --password "$${FORGE_ADMIN_PASSWORD}" \
+        --email "$${FORGE_ADMIN_EMAIL}" \
+        --admin \
+        --must-change-password=false
+      '

@@ -33,29 +33,50 @@ Or run it directly without installing (no project dependency needed):
 uvx --from git+https://github.com/sam-phinizy/joan.git joan --help
 ```
 
-### Install the Claude Code plugin
+### Install agent integrations
 
-Joan ships with a Claude Code plugin that teaches Claude the full review workflow — when to create PRs, how to check feedback, and how to push only approved work upstream.
-
-Run this once in each repo where you want Claude to use Joan:
+Joan can install agent-specific instructions that teach the Joan review workflow.
 
 ```bash
+# Claude Code plugin (run in each repo where Claude should use Joan)
 uv run joan skills install --agent claude
+
+# Codex skills (installs to $CODEX_HOME/skills/joan, default: ~/.codex/skills/joan)
+uv run joan skills install --agent codex
+
+# Same Codex install directly from GitHub without adding Joan as a dependency
+uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --agent codex
 ```
 
-This copies the plugin to `.claude/plugins/joan/`. Claude Code loads it automatically on the next session. Claude will then follow the Joan review cycle without being prompted.
+- Claude install target: `.claude/plugins/joan/`
+- Codex install target: `$CODEX_HOME/skills/joan/` (defaults to `~/.codex/skills/joan/`)
 
 ### Start Forgejo
 
-Joan routes reviews through a local [Forgejo](https://forgejo.org) instance. Start it with Docker:
+Joan routes reviews through a local [Forgejo](https://forgejo.org) instance running in Docker. You do not need to clone this repo — Joan bundles the compose file and can install it anywhere.
+
+Install the compose file to a directory of your choice (default: `~/joan-forge`):
 
 ```bash
-cd /path/to/joan/forge/
-docker compose up -d
-# Forgejo is now running at http://localhost:3000
+uv run joan forge install ~/joan-forge
 ```
 
-On first run, open `http://localhost:3000` in your browser and create an admin account.
+Then start Forgejo:
+
+```bash
+cd ~/joan-forge
+FORGE_ADMIN_PASSWORD=yourpassword docker compose up -d
+```
+
+Forgejo will be available at `http://localhost:3000`. The admin account is created automatically:
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `FORGE_ADMIN_PASSWORD` | *(required)* | Admin password |
+| `FORGE_ADMIN_USERNAME` | `$USER` (or `forgeadmin`) | Admin username |
+| `FORGE_ADMIN_EMAIL` | `admin@example.com` | Admin email |
+
+The `~/joan-forge/` directory is shared across all repos — set it up once.
 
 ## Setup (per repo)
 
@@ -132,4 +153,5 @@ upstream = "origin"      # default
 | `joan pr push` | Push approved branch to upstream |
 | `joan worktree create [name]` | Create an isolated git worktree |
 | `joan worktree remove <name>` | Remove a tracked worktree |
-| `joan skills install --agent claude` | Install the Claude Code plugin |
+| `joan skills install --agent <claude\|codex>` | Install the Claude plugin or Codex skills |
+| `joan forge install [path]` | Copy Forgejo docker-compose.yml to a directory |
