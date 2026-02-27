@@ -56,7 +56,7 @@ uv run joan skills install --agent codex
 uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --agent codex
 ```
 
-- Claude install target: `.claude/skills/` (skills are placed directly alongside other Claude skills)
+- Claude install target: `~/.claude/plugins/joan/` (global, shared across all repos)
 - Codex install target: `$CODEX_HOME/skills/joan/` (defaults to `~/.codex/skills/joan/`)
 
 ### Start Forgejo
