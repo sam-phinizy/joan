@@ -55,11 +55,26 @@ def test_branch_create_with_generated_name(monkeypatch) -> None:
     monkeypatch.setattr(branch_mod, "infer_branch_name", lambda: "codex/new-1")
     monkeypatch.setattr(branch_mod, "run_git", lambda args: calls.append(args) or "")
 
-    result = runner.invoke(branch_mod.app, [])
+    result = runner.invoke(branch_mod.app, ["create"])
 
     assert result.exit_code == 0
     assert calls[0] == ["checkout", "-b", "codex/new-1"]
     assert calls[1] == ["push", "-u", "joan-review", "codex/new-1"]
+
+
+def test_branch_push_current_branch(monkeypatch) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(branch_mod, "load_config_or_exit", make_config)
+    monkeypatch.setattr(branch_mod, "run_git", lambda args: calls.append(args) or "codex/existing-1" if args == ["rev-parse", "--abbrev-ref", "HEAD"] else calls.append(args) or "")
+
+    result = runner.invoke(branch_mod.app, ["push"])
+
+    assert result.exit_code == 0, result.output
+    assert ["rev-parse", "--abbrev-ref", "HEAD"] in calls
+    assert ["push", "-u", "joan-review", "codex/existing-1"] in calls
+    assert "Pushed branch" in result.output
 
 
 def test_remote_add_adds_remote_and_pushes(monkeypatch) -> None:
