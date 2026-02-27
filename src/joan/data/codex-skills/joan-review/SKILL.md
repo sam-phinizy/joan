@@ -172,7 +172,7 @@ After addressing all comments, commit the changes and push:
 ```
 git add <changed-files>
 git commit -m "Address review feedback"
-git push joan-review HEAD  # joan-review is the git remote pointing to local Forgejo
+uv run joan branch push
 ```
 
 ### 5. Re-check status
@@ -235,4 +235,4 @@ The branch is now on the upstream remote.
 | `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
 | `uv run joan pr comment resolve <id>` | Mark comment as resolved | `Resolved comment <id>` |
 | `uv run joan pr push` | Push approved branch upstream | `Pushed {branch} to origin` |
-| `git push joan-review HEAD` | Push new commits for re-review | Standard git output |
+| `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |
