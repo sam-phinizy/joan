@@ -26,15 +26,6 @@ def _source_for(agent: str) -> Path:
     return Path(__file__).parent.parent / "data" / "codex-skills"
 
 
-def _normalize_claude_layout(dest: Path) -> None:
-    meta_dir = dest / ".claude-plugin"
-    if not meta_dir.is_dir():
-        return
-    for entry in meta_dir.iterdir():
-        shutil.move(str(entry), str(dest / entry.name))
-    shutil.rmtree(meta_dir)
-
-
 def _remove_legacy_claude(cwd: Path) -> None:
     # Legacy 1: per-repo skills in .claude/skills/
     removed = False
@@ -71,7 +62,6 @@ def skills_install(
 
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dest)
-        _normalize_claude_layout(dest)
         typer.echo(f"Installed joan plugin for {agent} at {dest}")
     else:
         if dest.exists():

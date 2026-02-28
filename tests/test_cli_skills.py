@@ -18,7 +18,7 @@ def test_skills_install_claude(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     dest = tmp_path / ".claude" / "plugins" / "joan"
     assert dest.is_dir()
-    assert (dest / "plugin.json").exists()
+    assert (dest / ".claude-plugin" / "plugin.json").exists()
     assert (dest / "skills" / "joan-setup" / "SKILL.md").exists()
     assert (dest / "skills" / "joan-review" / "SKILL.md").exists()
     assert (dest / "skills" / "joan-resolve-pr-comments" / "SKILL.md").exists()
@@ -41,7 +41,7 @@ def test_skills_install_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert "Reinstalling" in result.output
     assert not sentinel.exists()
-    assert (dest / "plugin.json").exists()
+    assert (dest / ".claude-plugin" / "plugin.json").exists()
 
 
 def test_skills_install_removes_legacy_skills_dir(tmp_path: Path, monkeypatch) -> None:
@@ -61,7 +61,7 @@ def test_skills_install_removes_legacy_skills_dir(tmp_path: Path, monkeypatch) -
     assert "legacy" in result.output.lower()
     assert not (tmp_path / ".claude" / "skills" / "joan-setup").exists()
     assert not (tmp_path / ".claude" / "skills" / "joan-review").exists()
-    assert (tmp_path / ".claude" / "plugins" / "joan" / "plugin.json").exists()
+    assert (tmp_path / ".claude" / "plugins" / "joan" / ".claude-plugin" / "plugin.json").exists()
 
 
 def test_skills_install_removes_legacy_plugin_dir(tmp_path: Path, monkeypatch) -> None:
@@ -78,7 +78,7 @@ def test_skills_install_removes_legacy_plugin_dir(tmp_path: Path, monkeypatch) -
 
     assert result.exit_code == 0, result.output
     # Global install should succeed (it replaces the legacy dir)
-    assert (tmp_path / ".claude" / "plugins" / "joan" / "plugin.json").exists()
+    assert (tmp_path / ".claude" / "plugins" / "joan" / ".claude-plugin" / "plugin.json").exists()
 
 
 def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
