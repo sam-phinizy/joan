@@ -6,5 +6,12 @@
     "name": "Sam Phinizy",
     "url": "https://github.com/sam-phinizy"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "joan",
+      "description": "Local code review gate for AI agents via Forgejo. Agents push work to a local Forgejo instance, a human reviews it, and only approved work gets pushed to the real upstream.",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
 }
