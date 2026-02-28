@@ -31,14 +31,22 @@ Before starting, verify the following:
    ```
    The `forge/docker-compose.yml` in the Joan repo runs Forgejo on port 3000. The first user created in the Forgejo web UI becomes admin.
 
-3. **`uv` available**: Joan is run via `uv run joan`. Verify `uv` is installed:
+3. **`joan` installed**: Check if `joan` is available as a tool:
+   ```
+   joan --version
+   ```
+   If the command is not found, install it with:
+   ```
+   uv tool install git+https://github.com/sam-phinizy/joan.git
+   ```
+   Verify `uv` itself is available first if the above fails:
    ```
    uv --version
    ```
 
 ## Step 1: Run Init
 
-Run `uv run joan init` and **let the user handle the interactive prompts**. Do NOT try to pipe input or automate this command — it uses `typer.prompt` for interactive input.
+Run `joan init` and **let the user handle the interactive prompts**. Do NOT try to pipe input or automate this command — it uses `typer.prompt` for interactive input.
 
 The command will prompt for:
 - **Forgejo URL** (default: `http://localhost:3000`)
@@ -51,7 +59,7 @@ It creates or reuses the Forgejo user `joan`, creates an API token for that acco
 Expected output on success:
 ```
 Wrote config: .joan/config.toml
-Next step: run `uv run joan remote add`.
+Next step: run `joan remote add`.
 ```
 
 If authentication fails, verify the admin username and password are correct and that the Forgejo URL is reachable.
@@ -60,7 +68,7 @@ If authentication fails, verify the admin username and password are correct and 
 
 Run:
 ```
-uv run joan remote add
+joan remote add
 ```
 
 This command:
