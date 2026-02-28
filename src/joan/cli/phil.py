@@ -100,11 +100,27 @@ def phil_init() -> None:
     )
     path = write_agent_config(config, _PHIL_USERNAME, _repo_root())
     typer.echo(f"Wrote config: {path}")
-    typer.echo(
-        "Next step: In Forgejo, add a webhook to your repo pointing to "
-        f"http://<your-host>:{config.server.port}/webhook "
-        "with the secret from your config file."
-    )
+
+    # Attempt to auto-create the webhook using joan config for owner/repo.
+    try:
+        joan_config = read_config(_repo_root())
+        default_webhook_url = f"http://localhost:{config.server.port}/webhook"
+        webhook_url = typer.prompt("Webhook URL", default=default_webhook_url).strip()
+        client.create_webhook(
+            admin_username=admin_username,
+            admin_password=admin_password,
+            owner=joan_config.forgejo.owner,
+            repo=joan_config.forgejo.repo,
+            webhook_url=webhook_url,
+            secret=config.server.webhook_secret,
+        )
+        typer.echo(f"Created webhook pointing to {webhook_url}")
+    except FileNotFoundError:
+        typer.echo(
+            "Next step: In Forgejo, add a webhook to your repo pointing to "
+            f"http://<your-host>:{config.server.port}/webhook "
+            "with the secret from your config file."
+        )
 
 
 @app.command("serve")

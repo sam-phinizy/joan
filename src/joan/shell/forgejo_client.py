@@ -69,6 +69,32 @@ class ForgejoClient:
         self._raise_for_status(response)
         return response.json()
 
+    def create_webhook(
+        self,
+        admin_username: str,
+        admin_password: str,
+        owner: str,
+        repo: str,
+        webhook_url: str,
+        secret: str,
+        events: list[str] | None = None,
+    ) -> dict[str, Any]:
+        url = f"{self.base_url}/api/v1/repos/{owner}/{repo}/hooks"
+        payload = {
+            "active": True,
+            "config": {
+                "content_type": "json",
+                "secret": secret,
+                "url": webhook_url,
+            },
+            "events": events or ["pull_request"],
+            "type": "gitea",
+        }
+        with httpx.Client(timeout=30.0, auth=(admin_username, admin_password)) as client:
+            response = client.post(url, json=payload)
+        self._raise_for_status(response)
+        return response.json()
+
     def create_repo(self, name: str, private: bool = True) -> dict[str, Any]:
         return self._request_json("POST", "/api/v1/user/repos", json={"name": name, "private": private})
 
