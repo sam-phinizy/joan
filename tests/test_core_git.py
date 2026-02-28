@@ -7,6 +7,8 @@ import joan.core.git as git_mod
 
 def test_git_arg_builders() -> None:
     assert git_mod.create_branch_args("feat") == ["checkout", "-b", "feat"]
+    assert git_mod.checkout_branch_args("feat") == ["checkout", "feat"]
+    assert git_mod.merge_ff_only_args("topic") == ["merge", "--ff-only", "topic"]
     assert git_mod.push_branch_args("origin", "feat", set_upstream=True) == ["push", "-u", "origin", "feat"]
     assert git_mod.push_branch_args("origin", "feat", set_upstream=False) == ["push", "origin", "feat"]
     assert git_mod.push_refspec_args("joan-review", "refs/heads/feat", "refs/heads/joan/feat") == [

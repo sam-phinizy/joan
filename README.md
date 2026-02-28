@@ -5,10 +5,10 @@ Local code review gate for AI agents. Agents push work to a local [Forgejo](http
 ## How it works
 
 ```
-agent commits → joan pr create → human reviews on Forgejo → joan pr push → origin
+agent commits → joan pr create → human reviews on Forgejo → joan pr finish → local base branch → joan pr push → origin
 ```
 
-Joan enforces approval gates: `joan pr push` refuses to push if the PR is not approved or has unresolved comments.
+Joan enforces approval gates at `joan pr finish`: it refuses to finish a PR if the review is not approved or has unresolved comments.
 
 ## Prerequisites
 
@@ -142,7 +142,10 @@ uv run joan pr comments
 # Resolve a comment after addressing it
 uv run joan pr comment resolve <id>
 
-# Push to upstream once approved
+# Merge the approved review branch back into the local base branch
+uv run joan pr finish
+
+# Push that finished base branch upstream when you're ready
 uv run joan pr push
 ```
 
@@ -271,7 +274,8 @@ command = ["codex"]
 | `joan pr comment add --agent NAME --owner OWNER --repo REPO --pr N --path PATH --line N --body TEXT` | Post one inline PR comment immediately using an agent token |
 | `joan pr comment resolve <id>` | Mark a comment resolved |
 | `joan pr review submit --agent NAME --owner OWNER --repo REPO --pr N --verdict VERDICT [--body TEXT]` | Post a final review verdict on a specific PR using an agent token |
-| `joan pr push` | Push approved branch to upstream |
+| `joan pr finish` | Merge an approved review branch back into its local base branch |
+| `joan pr push` | Push the current finished local branch to upstream |
 | `joan worktree create [name]` | Create an isolated git worktree |
 | `joan worktree remove <name>` | Remove a tracked worktree |
 | `joan phil init` | Create the local `phil` agent account and write `.joan/agents/phil.toml` |

@@ -19,10 +19,10 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import push_branch_args, push_refspec_args, working_branch_for_review
+from joan.core.git import checkout_branch_args, merge_ff_only_args, push_branch_args, working_branch_for_review
 from joan.shell.git_runner import run_git
 
-app = typer.Typer(help="Open Forgejo PRs, inspect review state, and gate upstream pushes.")
+app = typer.Typer(help="Open Forgejo PRs, inspect review state, finish approved PRs locally, and push upstream separately.")
 comment_app = typer.Typer(help="Read or resolve PR comments.")
 review_app = typer.Typer(help="Post review verdicts on PRs.")
 app.add_typer(comment_app, name="comment")
@@ -153,8 +153,11 @@ def pr_comment_add(
     typer.echo(f"Posted inline comment on PR #{pr}")
 
 
-@app.command("push", help="Push the current branch to the real upstream remote, but only if the current PR is approved and clear.")
-def pr_push() -> None:
+@app.command(
+    "finish",
+    help="Fast-forward the current approved review branch into its original local base branch without pushing upstream.",
+)
+def pr_finish() -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
     pr = current_pr_or_exit(config)
@@ -170,8 +173,24 @@ def pr_push() -> None:
         raise typer.Exit(code=1)
 
     branch = current_branch()
-    run_git(push_refspec_args(config.remotes.upstream, branch, f"refs/heads/{pr.base_ref}"))
-    typer.echo(f"Pushed {branch} to {config.remotes.upstream}/{pr.base_ref}")
+    run_git(checkout_branch_args(pr.base_ref))
+    run_git(merge_ff_only_args(branch))
+    typer.echo(f"Merged {branch} into local {pr.base_ref}")
+
+
+@app.command("push", help="Push the current finished local branch to the real upstream remote.")
+def pr_push() -> None:
+    config = load_config_or_exit()
+    branch = current_branch()
+    if working_branch_for_review(branch):
+        typer.echo(
+            "Current branch is a review branch. Run `uv run joan pr finish` first to merge it back into the base branch locally.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    run_git(push_branch_args(config.remotes.upstream, branch, set_upstream=False))
+    typer.echo(f"Pushed {branch} to {config.remotes.upstream}/{branch}")
 
 
 @review_app.command("create", help="Post a review from JSON to the current branch's active PR.")

@@ -98,5 +98,10 @@ uv run joan pr sync
 Report:
 - whether any unresolved comments remain
 - whether the PR is approved
-- whether the user can now move on to pushing upstream with `/joan:joan-review`
-  or `uv run joan pr push`
+- when the PR is approved by the human reviewer and unresolved comments are `0`,
+  immediately finish by running `uv run joan pr finish` so the reviewed changes
+  land on the original local base branch without being pushed upstream
+- otherwise, whether the user can now move on to finishing the PR with
+  `/joan:joan-review` or `uv run joan pr finish`
+- only if the user explicitly wants to publish later, remind them they can run
+  `uv run joan pr push` from the finished base branch as a separate step

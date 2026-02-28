@@ -228,7 +228,7 @@ def test_pr_comments_rejects_pr_and_branch_together(monkeypatch, sample_config) 
     assert "either --pr or --branch" in result.output
 
 
-def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:
+def test_pr_finish_approval_gates_and_merges(monkeypatch, sample_config, sample_pr) -> None:
     runner = CliRunner()
     calls: list[list[str]] = []
 
@@ -254,7 +254,7 @@ def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:
         "forgejo_client",
         lambda _cfg: FakeClient(reviews=[{"id": 1, "state": "COMMENTED", "user": {"login": "r"}}], comments=[]),
     )
-    not_approved = runner.invoke(pr_mod.app, ["push"])
+    not_approved = runner.invoke(pr_mod.app, ["finish"])
     assert not_approved.exit_code == 1
     assert "not approved" in not_approved.output
 
@@ -266,7 +266,7 @@ def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:
             comments=[{"id": 1, "resolved": False, "user": {"login": "r"}}],
         ),
     )
-    unresolved = runner.invoke(pr_mod.app, ["push"])
+    unresolved = runner.invoke(pr_mod.app, ["finish"])
     assert unresolved.exit_code == 1
     assert "unresolved comments" in unresolved.output
 
@@ -278,9 +278,37 @@ def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:
             comments=[{"id": 1, "resolved": True, "user": {"login": "r"}}],
         ),
     )
-    ok = runner.invoke(pr_mod.app, ["push"])
+    ok = runner.invoke(pr_mod.app, ["finish"])
     assert ok.exit_code == 0
-    assert ["push", "origin", "joan-review/feat:refs/heads/feat"] in calls
+    assert ["checkout", "feat"] in calls
+    assert ["merge", "--ff-only", "joan-review/feat"] in calls
+
+
+def test_pr_push_requires_finished_branch(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
+
+    result = runner.invoke(pr_mod.app, ["push"])
+
+    assert result.exit_code == 2
+    assert "pr finish" in result.output
+
+
+def test_pr_push_pushes_current_branch(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "main")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    result = runner.invoke(pr_mod.app, ["push"])
+
+    assert result.exit_code == 0
+    assert ["push", "origin", "main"] in calls
+    assert "Pushed main to origin/main" in result.output
 
 
 def test_worktree_create_and_remove(monkeypatch, tmp_path: Path) -> None:

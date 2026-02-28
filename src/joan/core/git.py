@@ -7,6 +7,14 @@ def create_branch_args(name: str) -> list[str]:
     return ["checkout", "-b", name]
 
 
+def checkout_branch_args(name: str) -> list[str]:
+    return ["checkout", name]
+
+
+def merge_ff_only_args(branch: str) -> list[str]:
+    return ["merge", "--ff-only", branch]
+
+
 def push_branch_args(remote: str, branch: str, set_upstream: bool = True) -> list[str]:
     args = ["push"]
     if set_upstream:
