@@ -26,6 +26,22 @@ class Config:
 
 
 @dataclass(slots=True)
+class GlobalConfig:
+    url: str
+    token: str
+    owner: str = "joan"
+    human_user: str | None = None
+    remotes: RemotesConfig = field(default_factory=RemotesConfig)
+
+
+@dataclass(slots=True)
+class RepoConfig:
+    repo: str
+    human_user: str | None = None
+    remotes: RemotesConfig | None = None
+
+
+@dataclass(slots=True)
 class PullRequest:
     number: int
     title: str

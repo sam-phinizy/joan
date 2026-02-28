@@ -7,8 +7,13 @@ from pathlib import Path
 
 import typer
 
-from joan.core.models import Config, ForgejoConfig, RemotesConfig
-from joan.shell.config_io import read_config, write_config
+from joan.core.models import GlobalConfig, RemotesConfig, RepoConfig
+from joan.shell.config_io import (
+    global_config_path,
+    read_global_config,
+    write_global_config,
+    write_repo_config,
+)
 from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 
 app = typer.Typer(
@@ -23,62 +28,58 @@ def _generate_password(length: int = 32) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def _check_legacy_config() -> None:
-    try:
-        existing = read_config(Path.cwd())
-    except FileNotFoundError:
-        return
-    if existing.forgejo.owner != _JOAN_USERNAME:
-        typer.echo(
-            f"Migrating existing config: owner '{existing.forgejo.owner}' -> '{_JOAN_USERNAME}'."
-        )
-
-
 @app.command("init", help="Interactive setup for this repo's local Forgejo review flow.")
 def init_command() -> None:
-    _check_legacy_config()
-    default_url = "http://localhost:3000"
-    forgejo_url = typer.prompt("Forgejo URL", default=default_url).strip().rstrip("/")
-    admin_username = typer.prompt("Forgejo admin username").strip()
-    admin_password = typer.prompt("Forgejo admin password", hide_input=True)
+    global_cfg = read_global_config()
 
-    client = ForgejoClient(forgejo_url)
+    # Phase 1: Global setup (skipped if ~/.joan/config.toml already exists)
+    if global_cfg is None:
+        default_url = "http://localhost:3000"
+        forgejo_url = typer.prompt("Forgejo URL", default=default_url).strip().rstrip("/")
+        admin_username = typer.prompt("Forgejo admin username").strip()
+        admin_password = typer.prompt("Forgejo admin password", hide_input=True)
 
-    try:
-        client.create_user(
-            admin_username=admin_username,
-            admin_password=admin_password,
+        client = ForgejoClient(forgejo_url)
+
+        try:
+            client.create_user(
+                admin_username=admin_username,
+                admin_password=admin_password,
+                username=_JOAN_USERNAME,
+                email="joan@localhost",
+                password=_generate_password(),
+            )
+            typer.echo(f"Created Forgejo user '{_JOAN_USERNAME}'.")
+        except ForgejoError as exc:
+            if "already exists" not in str(exc).lower():
+                raise
+            typer.echo(f"Using existing Forgejo user '{_JOAN_USERNAME}'.")
+
+        token_name = f"joan-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+        token = client.create_token(
             username=_JOAN_USERNAME,
-            email="joan@localhost",
-            password=_generate_password(),
+            password=admin_password,
+            token_name=token_name,
+            auth_username=admin_username,
         )
-        typer.echo(f"Created Forgejo user '{_JOAN_USERNAME}'.")
-    except ForgejoError as exc:
-        if "already exists" not in str(exc).lower():
-            raise
-        typer.echo(f"Using existing Forgejo user '{_JOAN_USERNAME}'.")
 
-    token_name = f"joan-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
-    token = client.create_token(
-        username=_JOAN_USERNAME,
-        password=admin_password,
-        token_name=token_name,
-        auth_username=admin_username,
-    )
-
-    default_repo = Path.cwd().name
-    repo = typer.prompt("Forgejo repo", default=default_repo).strip()
-
-    config = Config(
-        forgejo=ForgejoConfig(
+        global_cfg = GlobalConfig(
             url=forgejo_url,
             token=token,
             owner=_JOAN_USERNAME,
-            repo=repo,
             human_user=admin_username,
-        ),
-        remotes=RemotesConfig(review="joan-review", upstream="origin"),
-    )
-    path = write_config(config, Path.cwd())
+            remotes=RemotesConfig(review="joan-review", upstream="origin"),
+        )
+        global_path = write_global_config(global_cfg)
+        typer.echo(f"Global config written to {global_path}")
+    else:
+        typer.echo(f"Using existing global config from {global_config_path()}")
+
+    # Phase 2: Per-repo setup (always runs)
+    default_repo = Path.cwd().name
+    repo = typer.prompt("Forgejo repo", default=default_repo).strip()
+
+    repo_cfg = RepoConfig(repo=repo)
+    path = write_repo_config(repo_cfg, Path.cwd())
     typer.echo(f"Wrote config: {path}")
     typer.echo("Next step: run `joan remote add`.")

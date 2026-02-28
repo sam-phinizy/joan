@@ -26,7 +26,7 @@ def make_config() -> Config:
 def test_init_command(monkeypatch) -> None:
     runner = CliRunner()
 
-    # New prompts: url, admin_username, admin_password, repo (no owner prompt)
+    # Prompts: url, admin_username, admin_password, repo
     prompts = iter([
         "http://forgejo.local",
         "sam",
@@ -36,7 +36,8 @@ def test_init_command(monkeypatch) -> None:
 
     monkeypatch.setattr(init_mod.typer, "prompt", lambda *_args, **_kwargs: next(prompts))
 
-    written_configs: list = []
+    written_global: list = []
+    written_repo: list = []
 
     class FakeForgejoClient:
         def __init__(self, _url):
@@ -49,16 +50,20 @@ def test_init_command(monkeypatch) -> None:
             return "token-abc"
 
     monkeypatch.setattr(init_mod, "ForgejoClient", FakeForgejoClient)
-    monkeypatch.setattr(init_mod, "write_config", lambda cfg, _cwd: written_configs.append(cfg) or Path(".joan/config.toml"))
+    monkeypatch.setattr(init_mod, "read_global_config", lambda: None)
+    monkeypatch.setattr(init_mod, "write_global_config", lambda cfg: written_global.append(cfg) or Path.home() / ".joan" / "config.toml")
+    monkeypatch.setattr(init_mod, "write_repo_config", lambda cfg, _cwd: written_repo.append(cfg) or Path(".joan/config.toml"))
 
     result = runner.invoke(init_mod.app, [])
 
     assert result.exit_code == 0, result.output
     assert "Wrote config" in result.output
     assert "Next step" in result.output
-    assert len(written_configs) == 1
-    assert written_configs[0].forgejo.owner == "joan"
-    assert written_configs[0].forgejo.human_user == "sam"
+    assert len(written_global) == 1
+    assert written_global[0].owner == "joan"
+    assert written_global[0].human_user == "sam"
+    assert len(written_repo) == 1
+    assert written_repo[0].repo == "my-project"
 
 
 def test_init_command_reuses_existing_joan_user(monkeypatch) -> None:
@@ -86,7 +91,9 @@ def test_init_command_reuses_existing_joan_user(monkeypatch) -> None:
             return "token-abc"
 
     monkeypatch.setattr(init_mod, "ForgejoClient", FakeForgejoClient)
-    monkeypatch.setattr(init_mod, "write_config", lambda _cfg, _cwd: Path(".joan/config.toml"))
+    monkeypatch.setattr(init_mod, "read_global_config", lambda: None)
+    monkeypatch.setattr(init_mod, "write_global_config", lambda _cfg: Path.home() / ".joan" / "config.toml")
+    monkeypatch.setattr(init_mod, "write_repo_config", lambda _cfg, _cwd: Path(".joan/config.toml"))
 
     result = runner.invoke(init_mod.app, [])
 
@@ -94,44 +101,30 @@ def test_init_command_reuses_existing_joan_user(monkeypatch) -> None:
     assert "Wrote config" in result.output
 
 
-def test_init_warns_on_legacy_owner_config(monkeypatch, tmp_path: Path) -> None:
+def test_init_command_skips_global_setup_when_global_config_exists(monkeypatch) -> None:
+    """When ~/.joan/config.toml already exists, global setup (Forgejo prompts) is skipped."""
+    from joan.core.models import GlobalConfig, RemotesConfig
     runner = CliRunner()
-    monkeypatch.chdir(tmp_path)
 
-    # Write a legacy config with owner != "joan"
-    legacy_config = tmp_path / ".joan" / "config.toml"
-    legacy_config.parent.mkdir(parents=True)
-    legacy_config.write_text(
-        '[forgejo]\nurl = "http://forgejo.local"\ntoken = "oldtok"\nowner = "sam"\nrepo = "myrepo"\n'
+    existing_global = GlobalConfig(
+        url="http://forgejo.local",
+        token="existing-token",
+        owner="joan",
+        human_user="sam",
+        remotes=RemotesConfig(),
     )
 
-    prompts = iter([
-        "http://forgejo.local",
-        "sam",
-        "secret",
-        "my-project",
-    ])
+    # Only the repo prompt should be issued
+    prompts = iter(["other-project"])
     monkeypatch.setattr(init_mod.typer, "prompt", lambda *_args, **_kwargs: next(prompts))
-
-    class FakeForgejoClient:
-        def __init__(self, _url):
-            pass
-
-        def create_user(self, **_kwargs):
-            return {"id": 1, "login": "joan"}
-
-        def create_token(self, **_kwargs):
-            return "token-abc"
-
-    monkeypatch.setattr(init_mod, "ForgejoClient", FakeForgejoClient)
+    monkeypatch.setattr(init_mod, "read_global_config", lambda: existing_global)
+    monkeypatch.setattr(init_mod, "write_repo_config", lambda _cfg, _cwd: Path(".joan/config.toml"))
 
     result = runner.invoke(init_mod.app, [])
 
     assert result.exit_code == 0, result.output
-    assert "migrat" in result.output.lower()
-    # Config should now use joan as owner
-    written = legacy_config.read_text()
-    assert 'owner = "joan"' in written
+    assert "Using existing global config" in result.output
+    assert "Wrote config" in result.output
 
 
 def test_branch_create_with_generated_name(monkeypatch) -> None:
