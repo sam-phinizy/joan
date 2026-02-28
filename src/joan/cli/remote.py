@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse, urlunparse
+
 import typer
 
 from joan.cli._common import load_config_or_exit
@@ -36,12 +38,17 @@ def remote_add() -> None:
     if not clone_url:
         clone_url = f"{config.forgejo.url}/{config.forgejo.owner}/{config.forgejo.repo}.git"
 
+    parsed = urlparse(clone_url)
+    auth_clone_url = urlunparse(
+        parsed._replace(netloc=f"{config.forgejo.owner}:{config.forgejo.token}@{parsed.netloc}")
+    )
+
     remotes = set(run_git(list_remotes_args()).splitlines())
     if config.remotes.review in remotes:
-        run_git(remote_set_url_args(config.remotes.review, clone_url))
+        run_git(remote_set_url_args(config.remotes.review, auth_clone_url))
         typer.echo(f"Updated remote {config.remotes.review} -> {clone_url}")
     else:
-        run_git(remote_add_args(config.remotes.review, clone_url))
+        run_git(remote_add_args(config.remotes.review, auth_clone_url))
         typer.echo(f"Added remote {config.remotes.review} -> {clone_url}")
 
     branch = run_git(current_branch_args())
