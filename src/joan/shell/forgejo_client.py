@@ -130,6 +130,10 @@ class ForgejoClient:
     def create_pr(self, owner: str, repo: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/pulls", json=payload)
 
+    def request_pr_reviewers(self, owner: str, repo: str, index: int, reviewers: list[str]) -> dict[str, Any]:
+        payload = {"reviewers": reviewers}
+        return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/requested_reviewers", json=payload)
+
     def list_pulls(self, owner: str, repo: str, head: str | None = None) -> list[dict[str, Any]]:
         params: dict[str, str] = {"state": "open"}
         if head:

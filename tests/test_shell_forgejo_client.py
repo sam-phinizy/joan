@@ -130,6 +130,26 @@ def test_add_repo_collaborator_sends_permission(monkeypatch) -> None:
     ]
 
 
+def test_request_pr_reviewers_posts_requested_reviewers(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        return {"ok": True}
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    assert client.request_pr_reviewers("joan", "demo", 5, ["sam"]) == {"ok": True}
+    assert calls == [
+        (
+            "POST",
+            "/api/v1/repos/joan/demo/pulls/5/requested_reviewers",
+            {"json": {"reviewers": ["sam"]}},
+        )
+    ]
+
+
 def test_list_and_create_ssh_keys(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
     calls: list[tuple[str, str, dict]] = []

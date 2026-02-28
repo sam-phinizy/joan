@@ -53,6 +53,87 @@ def test_pr_create(monkeypatch, sample_config) -> None:
     assert "PR #4" in result.output
 
 
+def test_pr_create_requests_human_review_by_default(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    sample_config.forgejo.human_user = "alex"
+    calls: list[list[str]] = []
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
+            return {
+                "number": 4,
+                "title": "t",
+                "html_url": "http://forgejo.local/pr/4",
+                "state": "open",
+                "head": {"ref": "joan-review/feat"},
+                "base": {"ref": "feat"},
+            }
+
+        def request_pr_reviewers(self, owner, repo, index, reviewers):
+            captured["reviewer_call"] = {
+                "owner": owner,
+                "repo": repo,
+                "index": index,
+                "reviewers": reviewers,
+            }
+            return {}
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    result = runner.invoke(pr_mod.app, ["create"])
+
+    assert result.exit_code == 0
+    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
+    assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
+    assert captured["reviewer_call"] == {
+        "owner": "sam",
+        "repo": "joan",
+        "index": 4,
+        "reviewers": ["alex"],
+    }
+
+
+def test_pr_create_can_skip_human_review_request(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    sample_config.forgejo.human_user = "alex"
+    calls: list[list[str]] = []
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
+            return {
+                "number": 4,
+                "title": "t",
+                "html_url": "http://forgejo.local/pr/4",
+                "state": "open",
+                "head": {"ref": "joan-review/feat"},
+                "base": {"ref": "feat"},
+            }
+
+        def request_pr_reviewers(self, *_args, **_kwargs):
+            raise AssertionError("human review should not be requested")
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    result = runner.invoke(pr_mod.app, ["create", "--no-request-human-review"])
+
+    assert result.exit_code == 0
+    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
+    assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
+    assert "PR #4" in result.output
+
+
 def test_pr_create_requires_review_branch_without_base(monkeypatch, sample_config) -> None:
     runner = CliRunner()
 

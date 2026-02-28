@@ -34,6 +34,11 @@ def pr_create(
     title: str | None = typer.Option(default=None, help="PR title"),
     body: str | None = typer.Option(default=None, help="PR body"),
     base: str | None = typer.Option(default=None, help="Base branch (defaults to the working branch for this review branch)"),
+    request_human_review: bool = typer.Option(
+        True,
+        "--request-human-review/--no-request-human-review",
+        help="Request review from the configured human user after opening the PR.",
+    ),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
@@ -53,6 +58,9 @@ def pr_create(
     payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=body)
     pr_raw = client.create_pr(config.forgejo.owner, config.forgejo.repo, payload)
     pr = parse_pr_response(pr_raw)
+    human_user = config.forgejo.human_user
+    if request_human_review and human_user and human_user != config.forgejo.owner:
+        client.request_pr_reviewers(config.forgejo.owner, config.forgejo.repo, pr.number, [human_user])
     typer.echo(f"PR #{pr.number}: {pr.url}")
 
 
