@@ -59,6 +59,52 @@ uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --age
 - Claude install target: `~/.claude/plugins/joan/` (global, shared across all repos)
 - Codex install target: `$CODEX_HOME/skills/joan/` (defaults to `~/.codex/skills/joan/`)
 
+## Bundled Hooks And Skills
+
+Joan ships a small set of agent integrations so Claude Code and Codex can follow the same guarded review workflow.
+
+### Claude plugin bundle
+
+The Claude install places a full plugin bundle in `~/.claude/plugins/joan/`. That bundle includes:
+
+| Item | What it does |
+|---------|-------------|
+| `.claude-plugin/plugin.json` | Claude plugin metadata for the Joan plugin |
+| `.claude-plugin/marketplace.json` | Marketplace metadata for publishing/installing the plugin |
+| `hooks/hooks.json` | Registers a `PreToolUse` hook for Claude's `Bash` tool |
+| `hooks/enforce-review-branch.sh` | Blocks `git commit` unless the current branch is a Joan review branch |
+| `skills/joan-setup/SKILL.md` | Setup workflow guidance |
+| `skills/joan-review/SKILL.md` | End-to-end review workflow guidance |
+| `skills/joan-resolve-pr-comments/SKILL.md` | Guided PR comment resolution workflow |
+
+The `enforce-review-branch.sh` hook is intentionally narrow:
+
+- It only runs for Claude `Bash` tool calls.
+- It only blocks commands that include `git commit`.
+- It only enforces inside repos that already have `.joan/config.toml`.
+- It reads the review remote from `.joan/config.toml` (`[remotes].review`) and falls back to `joan-review`.
+- It allows commits when the current branch's upstream tracks that review remote, and denies the commit otherwise.
+
+In practice, this prevents accidental commits on `main` or another non-review branch after Joan is configured.
+
+### Codex skills bundle
+
+The Codex install places Joan skills in `$CODEX_HOME/skills/joan/` (default `~/.codex/skills/joan/`). Codex gets the same three workflow skills, without the Claude-specific hook/plugin wrapper:
+
+| Skill | Purpose |
+|---------|-------------|
+| `joan-setup` | Walks through one-time repo setup: verify Forgejo is running, run `joan init`, run `joan remote add`, and confirm `.joan/` is ignored |
+| `joan-review` | Covers the full review lifecycle: create a review branch, open a PR, check status/comments, finish an approved PR locally, and only push upstream when explicitly requested |
+| `joan-resolve-pr-comments` | Turns unresolved review comments into a step-by-step work queue, resolves actionable comments one at a time, and flags PR-level discussion comments that must be handled in Forgejo's UI |
+
+### Repo layout for contributors
+
+If you are editing Joan itself, the checked-in integration assets live in:
+
+- `hooks/` for the Claude hook definition and shell script
+- `skills/` for the human-readable skill files used in the Claude plugin bundle
+- `src/joan/data/codex-skills/` for the packaged Codex skill assets that `joan skills install --agent codex` copies into `$CODEX_HOME`
+
 ### Start Forgejo
 
 Joan routes reviews through a local [Forgejo](https://forgejo.org) instance running in Docker. You do not need to clone this repo — Joan bundles the compose file and can install it anywhere.
