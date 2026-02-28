@@ -4,8 +4,9 @@ description: >-
   Put an already-formed plan into Joan's review workflow. This skill should be
   used when the user already has a plan, outline, or agreed direction and wants
   to scaffold a plan document, create a plan review branch, open a plan PR on
-  Forgejo, check plan PR status, or land an approved plan. This skill is for
-  review logistics, not brainstorming or writing the plan from scratch.
+  Forgejo, check plan PR status, or land an approved plan. It can be used for a
+  product plan or an implementation plan. This skill is for review logistics,
+  not brainstorming or writing the plan from scratch.
 ---
 
 # Joan Plan Review
@@ -18,6 +19,8 @@ Use this skill when the user already knows what they want to build and wants to:
 - put that plan on a Joan review branch
 - open a PR so humans can comment on the plan
 - check or finish a plan PR after review
+
+This can be a high-level product plan or a more detailed implementation plan. If the implementation plan is still worth reviewing before code, this skill is the right entry point.
 
 Do not use this skill to run product discovery, brainstorm options, or generate a planning methodology. If the user is still figuring out the plan, help them with that separately first.
 

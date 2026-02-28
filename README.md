@@ -45,7 +45,7 @@ uvx --from git+https://github.com/sam-phinizy/joan.git joan --help
 
 ### Install agent integrations
 
-Joan can install agent-specific instructions that teach the Joan review workflow.
+Joan can install agent-specific instructions that teach the Joan review workflow. Those skills only become available to the agent after you run the relevant `joan skills install` command.
 
 ```bash
 # Claude Code plugin (run in each repo where Claude should use Joan)
@@ -92,7 +92,7 @@ In practice, this prevents accidental commits on `main` or another non-review br
 
 ### Codex skills bundle
 
-The Codex install places Joan skills in `$CODEX_HOME/skills/joan/` (default `~/.codex/skills/joan/`). Codex gets the same three workflow skills, without the Claude-specific hook/plugin wrapper:
+The Codex install places Joan skills in `$CODEX_HOME/skills/joan/` (default `~/.codex/skills/joan/`). Codex gets the same four workflow skills, without the Claude-specific hook/plugin wrapper:
 
 | Skill | Purpose |
 |---------|-------------|
@@ -209,7 +209,7 @@ Use your preferred planning workflow first, then let Joan review the resulting p
 uv run joan plan create cache-invalidation --title "Cache invalidation strategy"
 ```
 
-This creates a plan file in `docs/plans/`, puts it on a dedicated review branch, and opens a PR for feedback by default.
+This creates a plan file in `docs/plans/`, puts it on a dedicated review branch, and opens a PR for feedback by default. You can use the same flow for a higher-level product plan or for a more detailed implementation plan that you want reviewed before code starts.
 
 After the plan PR is approved, use `uv run joan pr finish` to land the plan locally. Implementation is a separate next step and only begins when you explicitly start it.
 

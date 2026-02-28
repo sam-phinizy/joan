@@ -25,7 +25,7 @@ Joan gates all code through local Forgejo review before it reaches upstream (Git
 
 All Joan data commands (`pr sync`, `pr comments`) output structured JSON to stdout.
 
-If the user is still in the planning stage and wants feedback on a plan before code exists, use `$joan-plan` first. This skill is for the code review cycle after implementation work has started.
+If the user is still in the planning stage and wants feedback on a plan before code exists, prefer `$joan-plan` when that skill is available. If it is not available in the current session, use `uv run joan plan create ...` directly. This skill is for the code review cycle after implementation work has started.
 
 ## Determine Current State
 
