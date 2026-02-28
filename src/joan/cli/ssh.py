@@ -9,7 +9,7 @@ import typer
 from joan.cli._common import forgejo_client, load_config_or_exit
 from joan.shell.forgejo_client import ForgejoError
 
-app = typer.Typer(help="Manage SSH key setup for Forgejo access.")
+app = typer.Typer(help="Create or reuse an SSH keypair and upload the public key to Forgejo.")
 
 
 @app.callback()
@@ -53,15 +53,15 @@ def _ensure_keypair(private_key_path: Path, comment: str) -> bool:
     return True
 
 
-@app.command("setup")
+@app.command("setup", help="Create/reuse an SSH keypair and ensure its public key is present on Forgejo.")
 def ssh_setup(
     key_path: Path = typer.Option(
         default_factory=_default_key_path,
-        help="Private key path to create/use (public key uses the same path with .pub).",
+        help="Private key path to create/use. The public key uses the same path with a `.pub` suffix.",
     ),
     title: str | None = typer.Option(
         default=None,
-        help="Forgejo SSH key title. Defaults to joan-<hostname>.",
+        help="Forgejo SSH key title. Defaults to `joan-<hostname>`.",
     ),
 ) -> None:
     config = load_config_or_exit()

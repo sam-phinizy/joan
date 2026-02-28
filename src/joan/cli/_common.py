@@ -48,11 +48,26 @@ def current_branch() -> str:
         raise typer.Exit(code=2)
 
 
-def current_pr_or_exit(config: Config) -> PullRequest:
-    branch = current_branch()
+def current_pr_or_exit(
+    config: Config,
+    pr_number: int | None = None,
+    branch: str | None = None,
+) -> PullRequest:
     client = forgejo_client(config)
+    if pr_number is not None:
+        try:
+            pr_raw = client.get_pr(config.forgejo.owner, config.forgejo.repo, pr_number)
+        except ForgejoError as exc:
+            if "Forgejo API 404" in str(exc):
+                typer.echo(f"Pull request #{pr_number} was not found.", err=True)
+                raise typer.Exit(code=1)
+            typer.echo(f"Forgejo request failed: {exc}", err=True)
+            raise typer.Exit(code=2)
+        return parse_pr_response(pr_raw)
+
+    resolved_branch = branch or current_branch()
     try:
-        pulls = client.list_pulls(config.forgejo.owner, config.forgejo.repo, head=f"{config.forgejo.owner}:{branch}")
+        pulls = client.list_pulls(config.forgejo.owner, config.forgejo.repo, head=f"{config.forgejo.owner}:{resolved_branch}")
     except ForgejoError as exc:
         if "Forgejo API 404" in str(exc):
             typer.echo(
@@ -65,7 +80,7 @@ def current_pr_or_exit(config: Config) -> PullRequest:
         typer.echo(f"Forgejo request failed: {exc}", err=True)
         raise typer.Exit(code=2)
     if not pulls:
-        typer.echo(f"No open PR found for branch '{branch}'.", err=True)
+        typer.echo(f"No open PR found for branch '{resolved_branch}'.", err=True)
         raise typer.Exit(code=1)
     return parse_pr_response(pulls[0])
 

@@ -98,10 +98,10 @@ uv run joan init
 
 You will be prompted for:
 - Forgejo URL (default: `http://localhost:3000`)
-- Forgejo username and password
+- Forgejo admin username and password
 - Which Forgejo repo to use (defaults to current directory name)
 
-This creates an API token on Forgejo and writes `.joan/config.toml`. Add `.joan/` to your `.gitignore` — the config contains an API token and must never be committed.
+This creates or reuses the Forgejo user `joan`, creates an API token for that account, stores the admin username as the default human reviewer, and writes `.joan/config.toml`. Add `.joan/` to your `.gitignore` — the config contains an API token and must never be committed.
 
 **2. Set up SSH key for Forgejo (recommended)**
 
@@ -124,6 +124,7 @@ uv run joan remote add
 ```
 
 Creates a private repo on Forgejo and adds `joan-review` as a git remote pointing to it.
+It also grants the configured human reviewer admin access to the review repo.
 
 ## Daily workflow
 
@@ -144,6 +145,8 @@ uv run joan pr comment resolve <id>
 # Push to upstream once approved
 uv run joan pr push
 ```
+
+`uv run joan pr create` requests review from the configured human user by default. Pass `--no-request-human-review` if you need to skip that.
 
 ## Phil (Local AI Reviewer)
 
@@ -167,8 +170,10 @@ By default, Phil's worker command is `codex`. If you want Phil to drive a differ
 Point your repo webhook at:
 
 ```text
-http://<your-host>:9000/webhook
+http://host.docker.internal:9000/webhook
 ```
+
+`http://localhost:9000/webhook` will fail with the bundled Docker Forgejo setup because `localhost` resolves inside the Forgejo container. If `host.docker.internal` is unavailable in your environment, use any hostname or IP address that the container can reach.
 
 Use the `webhook_secret` from `.joan/agents/phil.toml`.
 

@@ -22,22 +22,25 @@ from joan.core.forgejo import (
 from joan.core.git import push_branch_args, push_refspec_args, working_branch_for_review
 from joan.shell.git_runner import run_git
 
-app = typer.Typer(help="Manage pull requests on Forgejo.")
-comment_app = typer.Typer(help="Manage PR comments.")
-review_app = typer.Typer(help="Post reviews on PRs.")
+app = typer.Typer(help="Open Forgejo PRs, inspect review state, and gate upstream pushes.")
+comment_app = typer.Typer(help="Read or resolve PR comments.")
+review_app = typer.Typer(help="Post review verdicts on PRs.")
 app.add_typer(comment_app, name="comment")
 app.add_typer(review_app, name="review")
 
 
-@app.command("create")
+@app.command("create", help="Create a PR from the current `joan-review/*` branch to its working branch on the review remote.")
 def pr_create(
-    title: str | None = typer.Option(default=None, help="PR title"),
-    body: str | None = typer.Option(default=None, help="PR body"),
-    base: str | None = typer.Option(default=None, help="Base branch (defaults to the working branch for this review branch)"),
+    title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
+    body: str | None = typer.Option(default=None, help="Optional PR body/description."),
+    base: str | None = typer.Option(
+        default=None,
+        help="Base branch. Defaults to the branch implied by the current `joan-review/*` branch.",
+    ),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
-        help="Request review from the configured human user after opening the PR.",
+        help="Request review from the configured human reviewer after opening the PR (default: on).",
     ),
 ) -> None:
     config = load_config_or_exit()
@@ -64,7 +67,7 @@ def pr_create(
     typer.echo(f"PR #{pr.number}: {pr.url}")
 
 
-@app.command("sync")
+@app.command("sync", help="Read approval state and unresolved comment count for the open PR on the current branch.")
 def pr_sync() -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
@@ -86,18 +89,42 @@ def pr_sync() -> None:
     )
 
 
-@app.command("comments")
-def pr_comments(all_comments: bool = typer.Option(False, "--all", help="Include resolved comments")) -> None:
+@app.command(
+    "comments",
+    help=(
+        "List unresolved PR-level and inline review comments. "
+        "Defaults to the open PR for the current branch; use --pr or --branch to inspect another PR."
+    ),
+)
+def pr_comments(
+    all_comments: bool = typer.Option(False, "--all", help="Include resolved comments from the targeted PR"),
+    pr_number: int | None = typer.Option(
+        None,
+        "--pr",
+        help="Pull request number to inspect instead of the current branch's open PR",
+    ),
+    branch: str | None = typer.Option(
+        None,
+        "--branch",
+        help="Branch whose open PR should be inspected (use your latest review branch when not checked out there)",
+    ),
+) -> None:
+    if pr_number is not None and branch is not None:
+        typer.echo("Pass either --pr or --branch, not both.", err=True)
+        raise typer.Exit(code=2)
+
     config = load_config_or_exit()
     client = forgejo_client(config)
-    pr = current_pr_or_exit(config)
+    pr = current_pr_or_exit(config, pr_number=pr_number, branch=branch.strip() if branch else None)
 
     comments = parse_comments(client.get_comments(config.forgejo.owner, config.forgejo.repo, pr.number))
     typer.echo(format_comments_json(comments, include_resolved=all_comments))
 
 
 @comment_app.command("resolve")
-def pr_comment_resolve(comment_id: int) -> None:
+def pr_comment_resolve(
+    comment_id: int = typer.Argument(..., help="Comment ID to resolve on the current branch's active PR.")
+) -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
     pr = current_pr_or_exit(config)
@@ -108,13 +135,13 @@ def pr_comment_resolve(comment_id: int) -> None:
 
 @comment_app.command("add")
 def pr_comment_add(
-    agent: str = typer.Option(..., "--agent", help="Agent name whose token should be used"),
-    owner: str = typer.Option(..., "--owner", help="Forgejo repo owner"),
-    repo: str = typer.Option(..., "--repo", help="Forgejo repo name"),
-    pr: int = typer.Option(..., "--pr", help="Pull request number"),
-    path: str = typer.Option(..., "--path", help="Path within the pull request diff"),
-    line: int = typer.Option(..., "--line", help="New-side line number"),
-    body: str = typer.Option(..., "--body", help="Comment body"),
+    agent: str = typer.Option(..., "--agent", help="Agent name whose Forgejo token should be used."),
+    owner: str = typer.Option(..., "--owner", help="Forgejo repo owner for the target PR."),
+    repo: str = typer.Option(..., "--repo", help="Forgejo repo name for the target PR."),
+    pr: int = typer.Option(..., "--pr", help="Pull request number to comment on."),
+    path: str = typer.Option(..., "--path", help="File path within the PR diff."),
+    line: int = typer.Option(..., "--line", help="New-side line number for the inline comment."),
+    body: str = typer.Option(..., "--body", help="Inline comment text to post."),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client_for_agent_or_exit(config, agent)
@@ -126,7 +153,7 @@ def pr_comment_add(
     typer.echo(f"Posted inline comment on PR #{pr}")
 
 
-@app.command("push")
+@app.command("push", help="Push the current branch to the real upstream remote, but only if the current PR is approved and clear.")
 def pr_push() -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
@@ -147,9 +174,13 @@ def pr_push() -> None:
     typer.echo(f"Pushed {branch} to {config.remotes.upstream}/{pr.base_ref}")
 
 
-@review_app.command("create")
+@review_app.command("create", help="Post a review from JSON to the current branch's active PR.")
 def pr_review_create(
-    json_input: str = typer.Option(..., "--json-input", help="Review JSON: {body, verdict, comments}"),
+    json_input: str = typer.Option(
+        ...,
+        "--json-input",
+        help="Review JSON payload for the current PR: {body, verdict, comments}.",
+    ),
 ) -> None:
     try:
         data = json.loads(json_input)
@@ -176,9 +207,9 @@ def pr_review_create(
     typer.echo(f"Posted review ({verdict}) on PR #{pr.number}")
 
 
-@review_app.command("approve")
+@review_app.command("approve", help="Approve the current branch's active PR.")
 def pr_review_approve(
-    body: str = typer.Option("", "--body", help="Review body"),
+    body: str = typer.Option("", "--body", help="Optional review summary/body."),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
@@ -194,9 +225,9 @@ def pr_review_approve(
     typer.echo(f"Approved PR #{pr.number}")
 
 
-@review_app.command("request-changes")
+@review_app.command("request-changes", help="Request changes on the current branch's active PR.")
 def pr_review_request_changes(
-    body: str = typer.Option("", "--body", help="Review body"),
+    body: str = typer.Option("", "--body", help="Optional review summary/body."),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
@@ -212,14 +243,14 @@ def pr_review_request_changes(
     typer.echo(f"Requested changes on PR #{pr.number}")
 
 
-@review_app.command("submit")
+@review_app.command("submit", help="Post a final review verdict on a specific PR using an agent token.")
 def pr_review_submit(
-    agent: str = typer.Option(..., "--agent", help="Agent name whose token should be used"),
-    owner: str = typer.Option(..., "--owner", help="Forgejo repo owner"),
-    repo: str = typer.Option(..., "--repo", help="Forgejo repo name"),
-    pr: int = typer.Option(..., "--pr", help="Pull request number"),
-    verdict: str = typer.Option(..., "--verdict", help="approve, request_changes, or comment"),
-    body: str = typer.Option("", "--body", help="Review body"),
+    agent: str = typer.Option(..., "--agent", help="Agent name whose Forgejo token should be used."),
+    owner: str = typer.Option(..., "--owner", help="Forgejo repo owner for the target PR."),
+    repo: str = typer.Option(..., "--repo", help="Forgejo repo name for the target PR."),
+    pr: int = typer.Option(..., "--pr", help="Pull request number to review."),
+    verdict: str = typer.Option(..., "--verdict", help="Review verdict: `approve`, `request_changes`, or `comment`."),
+    body: str = typer.Option("", "--body", help="Optional review summary/body."),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client_for_agent_or_exit(config, agent)

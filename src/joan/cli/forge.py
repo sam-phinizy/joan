@@ -5,16 +5,16 @@ from pathlib import Path
 
 import typer
 
-app = typer.Typer(help="Manage the local Forgejo instance.")
+app = typer.Typer(help="Install the bundled local Forgejo docker-compose setup.")
 
 _COMPOSE_SOURCE = Path(__file__).parent.parent / "data" / "forge" / "docker-compose.yml"
 
 
-@app.command("install")
+@app.command("install", help="Copy Joan's bundled Forgejo `docker-compose.yml` into a directory you can reuse across repos.")
 def forge_install(
     path: Path = typer.Argument(
         default=Path.home() / "joan-forge",
-        help="Directory to install Forgejo compose files into.",
+        help="Destination directory for the Forgejo compose file. Defaults to `~/joan-forge`.",
     ),
 ) -> None:
     """Copy the Forgejo docker-compose.yml to a directory and print start instructions."""

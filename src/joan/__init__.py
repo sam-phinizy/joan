@@ -13,7 +13,12 @@ from joan.cli.ssh import app as ssh_app
 from joan.cli.skills import app as skills_app
 from joan.cli.worktree import app as worktree_app
 
-app = typer.Typer(help="Joan: local code review gate for AI agents.")
+app = typer.Typer(
+    help=(
+        "Joan: local code review gate for AI agents. "
+        "Create a review branch, open a Forgejo PR, read feedback, and only push upstream after approval."
+    )
+)
 app.add_typer(init_app)
 app.add_typer(doctor_app, name="doctor")
 app.add_typer(phil_app, name="phil")

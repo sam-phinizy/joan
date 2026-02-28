@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-app = typer.Typer(help="Manage Joan skills and agent plugins.")
+app = typer.Typer(help="Install or refresh Joan's agent-specific skills and plugins.")
 
 _SUPPORTED_AGENTS = {"claude", "codex"}
 
@@ -38,9 +38,12 @@ def _remove_legacy_claude(cwd: Path) -> None:
         typer.echo(f"Removed legacy per-repo skills from {cwd / '.claude' / 'skills'}.")
 
 
-@app.command("install")
+@app.command("install", help="Install Joan's Claude plugin or Codex skills into the standard global location for that agent.")
 def skills_install(
-    agent: str = typer.Option(..., help=f"Agent to install skills/plugin for. Supported: {', '.join(sorted(_SUPPORTED_AGENTS))}"),
+    agent: str = typer.Option(
+        ...,
+        help=f"Target agent. Supported values: {', '.join(sorted(_SUPPORTED_AGENTS))}.",
+    ),
 ) -> None:
     if agent not in _SUPPORTED_AGENTS:
         typer.echo(f"Unknown agent '{agent}'. Supported agents: {', '.join(sorted(_SUPPORTED_AGENTS))}", err=True)

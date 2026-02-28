@@ -71,6 +71,33 @@ def test_current_pr_or_exit_returns_pull(monkeypatch, sample_config) -> None:
     assert pr.number == 5
 
 
+def test_current_pr_or_exit_can_fetch_explicit_pr(monkeypatch, sample_config) -> None:
+    class FakeClient:
+        def get_pr(self, *_args, **_kwargs):
+            return {"number": 8, "head": {"ref": "feature"}, "base": {"ref": "main"}}
+
+    monkeypatch.setattr(common, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(common, "current_branch", lambda: pytest.fail("current branch should not be read"))
+
+    pr = common.current_pr_or_exit(sample_config, pr_number=8)
+    assert isinstance(pr, PullRequest)
+    assert pr.number == 8
+
+
+def test_current_pr_or_exit_uses_explicit_branch(monkeypatch, sample_config) -> None:
+    class FakeClient:
+        def list_pulls(self, *_args, **kwargs):
+            assert kwargs["head"] == "sam:feature/other"
+            return [{"number": 6, "head": {"ref": "feature/other"}, "base": {"ref": "main"}}]
+
+    monkeypatch.setattr(common, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(common, "current_branch", lambda: pytest.fail("current branch should not be read"))
+
+    pr = common.current_pr_or_exit(sample_config, branch="feature/other")
+    assert isinstance(pr, PullRequest)
+    assert pr.number == 6
+
+
 def test_current_pr_or_exit_404_guidance(monkeypatch, sample_config, capsys) -> None:
     monkeypatch.setattr(common, "current_branch", lambda: "feature")
 

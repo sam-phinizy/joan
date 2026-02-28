@@ -174,6 +174,91 @@ def test_list_and_create_ssh_keys(monkeypatch) -> None:
     assert calls[1][2]["json"]["title"] == "joan-test"
 
 
+def test_get_comments_uses_issue_comments_endpoint(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if path.endswith("/reviews"):
+            return []
+        return [{"id": 1}]
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    assert client.get_comments("sam", "joan", 7) == [{"id": 1}]
+    assert calls == [
+        (
+            "GET",
+            "/api/v1/repos/sam/joan/issues/7/comments",
+            {},
+        ),
+        (
+            "GET",
+            "/api/v1/repos/sam/joan/pulls/7/reviews",
+            {},
+        ),
+    ]
+
+
+def test_get_comments_falls_back_to_pull_comments_on_404(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if path.endswith("/issues/7/comments"):
+            raise ForgejoError("Forgejo API 404: not found")
+        if path.endswith("/reviews"):
+            return []
+        return [{"id": 2}]
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    assert client.get_comments("sam", "joan", 7) == [{"id": 2}]
+    assert calls == [
+        (
+            "GET",
+            "/api/v1/repos/sam/joan/issues/7/comments",
+            {},
+        ),
+        (
+            "GET",
+            "/api/v1/repos/sam/joan/pulls/7/comments",
+            {},
+        ),
+        (
+            "GET",
+            "/api/v1/repos/sam/joan/pulls/7/reviews",
+            {},
+        ),
+    ]
+
+
+def test_get_comments_includes_inline_review_comments(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if path.endswith("/issues/7/comments"):
+            return [{"id": 1, "body": "top-level"}]
+        if path.endswith("/pulls/7/reviews"):
+            return [{"id": 4}, {"id": 5}]
+        if path.endswith("/pulls/7/reviews/4/comments"):
+            return [{"id": 9, "body": "inline"}]
+        if path.endswith("/pulls/7/reviews/5/comments"):
+            return [{"id": 1, "body": "duplicate top-level"}]
+        raise AssertionError(path)
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    assert client.get_comments("sam", "joan", 7) == [
+        {"id": 1, "body": "top-level"},
+        {"id": 9, "body": "inline"},
+    ]
+
+
 def test_resolve_comment_primary_success(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
 

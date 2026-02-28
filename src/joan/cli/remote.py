@@ -16,10 +16,10 @@ from joan.core.git import (
 from joan.shell.forgejo_client import ForgejoError
 from joan.shell.git_runner import run_git
 
-app = typer.Typer(help="Manage Joan remotes.")
+app = typer.Typer(help="Create or repair the git remote Joan uses for local Forgejo review.")
 
 
-@app.command("add")
+@app.command("add", help="Create/reuse the review repo on Forgejo, ensure the review remote points at it, and push the current branch.")
 def remote_add() -> None:
     config = load_config_or_exit()
 

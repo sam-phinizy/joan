@@ -11,7 +11,10 @@ from joan.shell.config_io import read_config
 from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 from joan.shell.git_runner import run_git
 
-app = typer.Typer(help="Check local Joan setup.", invoke_without_command=True)
+app = typer.Typer(
+    help="Check that this repo is ready for Joan: config present, review remote configured, and Forgejo access working.",
+    invoke_without_command=True,
+)
 
 
 @dataclass(slots=True)
@@ -166,7 +169,7 @@ def doctor_command(
     user: str | None = typer.Option(
         None,
         "--user",
-        help="Optional Forgejo username to verify has admin access to the review repo.",
+        help="Optional Forgejo username to verify as a collaborator with admin access to the review repo.",
     ),
 ) -> None:
     results: list[CheckResult] = []

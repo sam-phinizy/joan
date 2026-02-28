@@ -11,7 +11,9 @@ from joan.core.models import Config, ForgejoConfig, RemotesConfig
 from joan.shell.config_io import read_config, write_config
 from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 
-app = typer.Typer(help="Initialize Joan in the current repository.")
+app = typer.Typer(
+    help="Initialize Joan in this repository by creating/reusing the `joan` Forgejo account and writing `.joan/config.toml`."
+)
 
 _JOAN_USERNAME = "joan"
 
@@ -32,7 +34,7 @@ def _check_legacy_config() -> None:
         )
 
 
-@app.command("init")
+@app.command("init", help="Interactive setup for this repo's local Forgejo review flow.")
 def init_command() -> None:
     _check_legacy_config()
     default_url = "http://localhost:3000"

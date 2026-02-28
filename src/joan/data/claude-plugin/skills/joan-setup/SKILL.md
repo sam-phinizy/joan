@@ -42,20 +42,19 @@ Run `uv run joan init` and **let the user handle the interactive prompts**. Do N
 
 The command will prompt for:
 - **Forgejo URL** (default: `http://localhost:3000`)
-- **Forgejo username**
-- **Forgejo password** (hidden input)
-- **Forgejo owner** (default: the username)
+- **Forgejo admin username**
+- **Forgejo admin password** (hidden input)
 - **Forgejo repo** (default: current directory name)
 
-It creates an API token on Forgejo and writes `.joan/config.toml` with the connection details.
+It creates or reuses the Forgejo user `joan`, creates an API token for that account, records the admin username as the default human reviewer, and writes `.joan/config.toml` with the connection details.
 
 Expected output on success:
 ```
 Wrote config: .joan/config.toml
-Next step: run `joan remote add`.
+Next step: run `uv run joan remote add`.
 ```
 
-If authentication fails, verify the username and password are correct and that the Forgejo URL is reachable.
+If authentication fails, verify the admin username and password are correct and that the Forgejo URL is reachable.
 
 ## Step 2: Add Review Remote
 
@@ -66,6 +65,7 @@ uv run joan remote add
 
 This command:
 - Creates a private repo on Forgejo (or reuses an existing one)
+- Grants the configured human user admin access to that review repo
 - Adds a `joan-review` git remote pointing to the Forgejo repo
 - Pushes the current branch to `joan-review`
 

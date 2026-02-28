@@ -33,6 +33,18 @@ Run:
 uv run joan pr comments
 ```
 
+This includes both PR-level discussion comments and inline review comments.
+If the user points you at a different PR, or you are not on the branch whose PR
+you need to inspect, use:
+
+```
+uv run joan pr comments --pr <number>
+uv run joan pr comments --branch <latest-review-branch>
+```
+
+Prefer `--branch` when you know the latest review branch you need, but you are
+not currently checked out on it.
+
 - If this returns an empty array, tell the user there are no unresolved comments
   and run `uv run joan pr sync` to confirm the PR state.
 - If this fails because there is no open PR, tell the user and stop.
@@ -60,6 +72,9 @@ For each comment:
    ```
    uv run joan pr comment resolve <id>
    ```
+   This still resolves against the current branch's active PR. If you inspected
+   comments with `--pr` or `--branch`, switch into that PR's branch context
+   before resolving comments.
 6. Move to the next unresolved comment.
 
 ## Stop And Ask Rules

@@ -46,7 +46,7 @@ Before doing anything, figure out where you are in the review cycle:
 | State | Action |
 |-------|--------|
 | On `main`, no PR | Create a working branch first, then continue with Sub-workflow A |
-| On branch, no PR | Create PR (step 3 of Sub-workflow A) |
+| On branch, no PR | Start Sub-workflow A at step 1: create a Joan review branch, then create the PR |
 | PR exists, has unresolved comments or not approved | Sub-workflow B: Check & Address Feedback |
 | PR exists, approved, no unresolved comments | Sub-workflow C: Push Upstream |
 
@@ -57,6 +57,8 @@ Before doing anything, figure out where you are in the review cycle:
 Use this when starting fresh work that needs review.
 
 ### 1. Create a review branch
+
+Always do this before `uv run joan pr create` unless you intentionally plan to pass `--base` from a non-review branch. The normal Joan flow is to open PRs from a `joan-review/...` branch.
 
 ```
 uv run joan branch create [name]
@@ -83,6 +85,8 @@ uv run joan pr create --title "Short description of changes" --body "Detailed ex
 - `--title` defaults to the branch name if omitted
 - `--body` is optional
 - `--base` defaults to the base branch implied by `joan-review/<base-branch>`
+- By default, Joan requests review from the configured human user in `.joan/config.toml`
+- Pass `--no-request-human-review` to skip the automatic reviewer request
 - If you're not on a `joan-review/...` branch, pass `--base` explicitly
 
 Output:
@@ -126,6 +130,16 @@ If `approved` is `true` and `unresolved_comments` is `0`, skip to Sub-workflow C
 uv run joan pr comments
 ```
 
+This includes both PR-level discussion comments and inline review comments.
+If you need to inspect a different PR than the one implied by the current branch, use one of:
+
+```
+uv run joan pr comments --pr <number>
+uv run joan pr comments --branch <latest-review-branch>
+```
+
+Prefer `--branch` when you know the latest review branch you want, but you are not currently checked out on it.
+
 JSON output (array of unresolved comments):
 ```json
 [
@@ -163,6 +177,8 @@ For each unresolved comment:
    uv run joan pr comment resolve <id>
    ```
    Output: `Resolved comment <id>`
+
+`uv run joan pr comment resolve` still applies to the current branch's active PR. If you inspected comments with `--pr` or `--branch`, switch to that PR's working branch before resolving comments.
 
 Work through comments one at a time. This ensures each resolution is deliberate and traceable.
 
@@ -231,9 +247,11 @@ The branch is now on the upstream remote.
 | Command | Purpose | Output |
 |---------|---------|--------|
 | `uv run joan branch create [name]` | Create review branch | `Created review branch: {review_branch} (base: {working_branch})` |
-| `uv run joan pr create --title "..." --body "..."` | Open PR on Forgejo | `PR #N: {url}` |
+| `uv run joan pr create --title "..." --body "..."` | Open PR on Forgejo and request the configured human reviewer by default | `PR #N: {url}` |
 | `uv run joan pr sync` | Check approval & comment status | JSON: `{approved, unresolved_comments, latest_review_state}` |
-| `uv run joan pr comments` | List unresolved comments | JSON array of comment objects |
+| `uv run joan pr comments` | List unresolved PR-level and inline review comments for the current PR | JSON array of comment objects |
+| `uv run joan pr comments --pr N` | List unresolved comments for a specific PR | JSON array of comment objects |
+| `uv run joan pr comments --branch <name>` | List unresolved comments for the open PR on a specific branch | JSON array of comment objects |
 | `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
 | `uv run joan pr comment resolve <id>` | Mark comment as resolved | `Resolved comment <id>` |
 | `uv run joan pr push` | Push approved branch upstream | `Pushed {review_branch} to origin/{working_branch}` |

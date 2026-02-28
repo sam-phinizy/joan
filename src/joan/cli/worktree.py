@@ -8,7 +8,7 @@ import typer
 from joan.core.git import infer_branch_name, worktree_add_args, worktree_remove_args
 from joan.shell.git_runner import run_git
 
-app = typer.Typer(help="Manage local git worktrees.")
+app = typer.Typer(help="Create and remove local git worktrees for isolated agent runs.")
 
 
 def _tracking_file() -> Path:
@@ -28,8 +28,13 @@ def _save_tracking(data: dict[str, str]) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-@app.command("create")
-def worktree_create(name: str | None = typer.Argument(default=None)) -> None:
+@app.command("create", help="Create a new worktree on a new branch and record it in `.joan/worktrees.json`.")
+def worktree_create(
+    name: str | None = typer.Argument(
+        default=None,
+        help="Optional branch name for the worktree. Omit this to let Joan generate one.",
+    )
+) -> None:
     branch = name or infer_branch_name("worktree")
     path = Path.cwd().parent / branch.replace("/", "-")
 
@@ -41,8 +46,8 @@ def worktree_create(name: str | None = typer.Argument(default=None)) -> None:
     typer.echo(f"Created worktree {branch} at {path}")
 
 
-@app.command("remove")
-def worktree_remove(name: str = typer.Argument(...)) -> None:
+@app.command("remove", help="Remove a tracked worktree by the branch name Joan recorded for it.")
+def worktree_remove(name: str = typer.Argument(..., help="Tracked worktree branch name to remove.")) -> None:
     tracking = _load_tracking()
     path = tracking.get(name)
     if not path:

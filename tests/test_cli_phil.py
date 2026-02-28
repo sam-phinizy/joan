@@ -25,6 +25,10 @@ def make_phil_config() -> AgentConfig:
     )
 
 
+def test_default_webhook_url_targets_host_gateway() -> None:
+    assert phil_mod._default_webhook_url(9000) == "http://host.docker.internal:9000/webhook"
+
+
 def test_phil_init_creates_agent_config(monkeypatch, tmp_path: Path) -> None:
     runner = CliRunner()
 
@@ -93,6 +97,7 @@ def test_phil_init_existing_user(monkeypatch, tmp_path: Path) -> None:
         "write_agent_config",
         lambda cfg, name, _cwd: (tmp_path / ".joan" / "agents" / "phil.toml"),
     )
+    monkeypatch.setattr(phil_mod, "Path", type("FakePath", (), {"cwd": staticmethod(lambda: tmp_path)}))
 
     result = runner.invoke(phil_mod.app, ["init"])
     assert result.exit_code == 0, result.output

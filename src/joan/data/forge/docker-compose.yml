@@ -14,6 +14,8 @@ services:
     restart: always
     networks:
       - forgejo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./forgejo:/data
       - /etc/localtime:/etc/localtime:ro

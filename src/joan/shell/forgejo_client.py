@@ -149,7 +149,36 @@ class ForgejoClient:
         return list(data)
 
     def get_comments(self, owner: str, repo: str, index: int) -> list[dict[str, Any]]:
-        data = self._request_json("GET", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments")
+        comments = self._issue_comments_with_fallback(owner, repo, index)
+        try:
+            reviews = self.get_reviews(owner, repo, index)
+        except ForgejoError as exc:
+            if "Forgejo API 404" not in str(exc):
+                raise
+            reviews = []
+
+        seen_ids = {int(item["id"]) for item in comments if "id" in item}
+        for review in reviews:
+            review_id = review.get("id")
+            if not isinstance(review_id, int):
+                continue
+            for item in self.get_review_comments(owner, repo, index, review_id):
+                item_id = item.get("id")
+                if isinstance(item_id, int) and item_id in seen_ids:
+                    continue
+                comments.append(item)
+                if isinstance(item_id, int):
+                    seen_ids.add(item_id)
+        return comments
+
+    def get_review_comments(self, owner: str, repo: str, index: int, review_id: int) -> list[dict[str, Any]]:
+        path = f"/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews/{review_id}/comments"
+        try:
+            data = self._request_json("GET", path)
+        except ForgejoError as exc:
+            if "Forgejo API 404" not in str(exc):
+                raise
+            return []
         return list(data)
 
     def create_inline_pr_comment(
@@ -226,3 +255,14 @@ class ForgejoClient:
         if len(body) > 200:
             body = f"{body[:200]}..."
         raise ForgejoError(f"Forgejo API {response.status_code}: {body}")
+
+    def _issue_comments_with_fallback(self, owner: str, repo: str, index: int) -> list[dict[str, Any]]:
+        primary = f"/api/v1/repos/{owner}/{repo}/issues/{index}/comments"
+        fallback = f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments"
+        try:
+            data = self._request_json("GET", primary)
+        except ForgejoError as exc:
+            if "Forgejo API 404" not in str(exc):
+                raise
+            data = self._request_json("GET", fallback)
+        return list(data)

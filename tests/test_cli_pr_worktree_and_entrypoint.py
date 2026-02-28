@@ -158,7 +158,7 @@ def test_pr_sync(monkeypatch, sample_config, sample_pr) -> None:
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
-    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg: sample_pr)
+    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg, **_kwargs: sample_pr)
 
     result = runner.invoke(pr_mod.app, ["sync"])
     assert result.exit_code == 0
@@ -182,7 +182,7 @@ def test_pr_comments_and_resolve(monkeypatch, sample_config, sample_pr) -> None:
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
-    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg: sample_pr)
+    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg, **_kwargs: sample_pr)
 
     comments = runner.invoke(pr_mod.app, ["comments"])
     assert comments.exit_code == 0
@@ -192,6 +192,40 @@ def test_pr_comments_and_resolve(monkeypatch, sample_config, sample_pr) -> None:
     resolve = runner.invoke(pr_mod.app, ["comment", "resolve", "22"])
     assert resolve.exit_code == 0
     assert "Resolved comment 22" in resolve.output
+
+
+def test_pr_comments_can_target_explicit_pr(monkeypatch, sample_config, sample_pr) -> None:
+    runner = CliRunner()
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def get_comments(self, *_args, **_kwargs):
+            return [{"id": 1, "resolved": False, "user": {"login": "r"}}]
+
+    def fake_current_pr_or_exit(_config, pr_number=None, branch=None):
+        captured["pr_number"] = pr_number
+        captured["branch"] = branch
+        return sample_pr
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_pr_or_exit", fake_current_pr_or_exit)
+
+    result = runner.invoke(pr_mod.app, ["comments", "--pr", "7"])
+
+    assert result.exit_code == 0
+    assert captured == {"pr_number": 7, "branch": None}
+
+
+def test_pr_comments_rejects_pr_and_branch_together(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+
+    result = runner.invoke(pr_mod.app, ["comments", "--pr", "7", "--branch", "feature/demo"])
+
+    assert result.exit_code == 2
+    assert "either --pr or --branch" in result.output
 
 
 def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:

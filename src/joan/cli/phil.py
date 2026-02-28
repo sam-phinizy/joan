@@ -14,7 +14,7 @@ from joan.shell.agent_config_io import read_agent_config, write_agent_config
 from joan.shell.config_io import read_config
 from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 
-app = typer.Typer(help="Manage Phil, the AI code review bot.")
+app = typer.Typer(help="Manage Phil, the local AI reviewer that reacts to Forgejo review requests.")
 
 _PHIL_USERNAME = "phil"
 
@@ -38,6 +38,10 @@ def _worker_api_url(host: str, port: int) -> str:
     return f"http://{_normalize_local_host(host)}:{port}"
 
 
+def _default_webhook_url(port: int) -> str:
+    return f"http://host.docker.internal:{port}/webhook"
+
+
 def _load_configs() -> tuple[Config, AgentConfig]:
     try:
         joan_config = read_config(_repo_root())
@@ -54,7 +58,7 @@ def _load_configs() -> tuple[Config, AgentConfig]:
     return joan_config, phil_config
 
 
-@app.command("init")
+@app.command("init", help="Create/reuse the `phil` Forgejo account, write `.joan/agents/phil.toml`, and try to add a webhook.")
 def phil_init() -> None:
     default_url = "http://localhost:3000"
     forgejo_url = typer.prompt("Forgejo URL", default=default_url).strip().rstrip("/")
@@ -104,7 +108,7 @@ def phil_init() -> None:
     # Attempt to auto-create the webhook using joan config for owner/repo.
     try:
         joan_config = read_config(_repo_root())
-        default_webhook_url = f"http://localhost:{config.server.port}/webhook"
+        default_webhook_url = _default_webhook_url(config.server.port)
         webhook_url = typer.prompt("Webhook URL", default=default_webhook_url).strip()
         client.create_webhook(
             admin_username=admin_username,
@@ -118,15 +122,16 @@ def phil_init() -> None:
     except FileNotFoundError:
         typer.echo(
             "Next step: In Forgejo, add a webhook to your repo pointing to "
-            f"http://<your-host>:{config.server.port}/webhook "
+            f"{_default_webhook_url(config.server.port)} "
+            "(or another host-reachable address) "
             "with the secret from your config file."
         )
 
 
-@app.command("serve")
+@app.command("serve", help="Run only Phil's webhook server. Use this when a worker is running separately.")
 def phil_serve(
-    port: int | None = typer.Option(None, "--port", help="Override server port from config"),
-    host: str | None = typer.Option(None, "--host", help="Override server host from config"),
+    port: int | None = typer.Option(None, "--port", help="Server port. Defaults to the value in `.joan/agents/phil.toml`."),
+    host: str | None = typer.Option(None, "--host", help="Server bind host. Defaults to the value in `.joan/agents/phil.toml`."),
 ) -> None:
     import uvicorn
 
@@ -141,11 +146,11 @@ def phil_serve(
     uvicorn.run(app_instance, host=effective_host, port=effective_port)
 
 
-@app.command("work")
+@app.command("work", help="Run only Phil's worker loop. Use this when the webhook server is already running.")
 def phil_work(
-    api_url: str | None = typer.Option(None, "--api-url", help="Worker API base URL"),
-    poll_interval: float | None = typer.Option(None, "--poll-interval", help="Poll interval in seconds"),
-    timeout: float | None = typer.Option(None, "--timeout", help="Per-job timeout in seconds"),
+    api_url: str | None = typer.Option(None, "--api-url", help="Worker API base URL. Defaults to the configured local Phil server."),
+    poll_interval: float | None = typer.Option(None, "--poll-interval", help="Seconds between queue polls. Defaults to config."),
+    timeout: float | None = typer.Option(None, "--timeout", help="Maximum seconds per review job. Defaults to config."),
 ) -> None:
     _joan_config, phil_config = _load_configs()
     effective_api_url = api_url or phil_config.worker.api_url or _worker_api_url(phil_config.server.host, phil_config.server.port)
@@ -157,13 +162,13 @@ def phil_work(
     run_worker_loop(effective_api_url, runner, effective_poll_interval)
 
 
-@app.command("up")
+@app.command("up", help="Run the Phil webhook server and one local worker together in a single process.")
 def phil_up(
-    port: int | None = typer.Option(None, "--port", help="Override server port from config"),
-    host: str | None = typer.Option(None, "--host", help="Override server host from config"),
-    api_url: str | None = typer.Option(None, "--api-url", help="Override worker API base URL"),
-    poll_interval: float | None = typer.Option(None, "--poll-interval", help="Worker poll interval in seconds"),
-    timeout: float | None = typer.Option(None, "--timeout", help="Per-job timeout in seconds"),
+    port: int | None = typer.Option(None, "--port", help="Server port. Defaults to the value in `.joan/agents/phil.toml`."),
+    host: str | None = typer.Option(None, "--host", help="Server bind host. Defaults to the value in `.joan/agents/phil.toml`."),
+    api_url: str | None = typer.Option(None, "--api-url", help="Worker API base URL. Defaults to the local Phil server started by this command."),
+    poll_interval: float | None = typer.Option(None, "--poll-interval", help="Seconds between worker queue polls. Defaults to config."),
+    timeout: float | None = typer.Option(None, "--timeout", help="Maximum seconds per review job. Defaults to config."),
 ) -> None:
     import uvicorn
 
