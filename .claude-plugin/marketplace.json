@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "name": "Joan",
+  "name": "joan",
   "description": "Local code review gate for AI agents via Forgejo",
   "owner": {
     "name": "Sam Phinizy",
