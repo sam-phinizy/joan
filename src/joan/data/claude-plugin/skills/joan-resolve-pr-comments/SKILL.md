@@ -75,6 +75,13 @@ For each comment:
    This still resolves against the current branch's active PR. If you inspected
    comments with `--pr` or `--branch`, switch into that PR's branch context
    before resolving comments.
+
+   **If this command fails with an API error (e.g. 405):** the comment is a
+   PR-level discussion comment that cannot be resolved via the API — only inline
+   review comments (with a `line` value) can be. Tell the user which comment IDs
+   need manual resolution and give them the direct Forgejo PR URL from
+   `.joan/config.toml` so they can resolve them in the web UI. Do not stop
+   working on other comments; continue with the next one.
 6. Move to the next unresolved comment.
 
 ## Stop And Ask Rules
