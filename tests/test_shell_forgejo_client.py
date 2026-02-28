@@ -87,6 +87,28 @@ def test_create_repo_and_list_pulls(monkeypatch) -> None:
     assert calls[1][2]["params"]["head"] == "sam:branch"
 
 
+def test_get_current_user_repo_and_collaborator_permission(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if path == "/api/v1/user":
+            return {"login": "joan"}
+        if path == "/api/v1/repos/sam/joan":
+            return {"name": "joan"}
+        return {"permission": "admin"}
+
+    monkeypatch.setattr(client, "_request_json", fake_request_json)
+
+    assert client.get_current_user()["login"] == "joan"
+    assert client.get_repo("sam", "joan")["name"] == "joan"
+    assert client.get_repo_collaborator_permission("sam", "joan", "alex")["permission"] == "admin"
+    assert calls[0][:2] == ("GET", "/api/v1/user")
+    assert calls[1][:2] == ("GET", "/api/v1/repos/sam/joan")
+    assert calls[2][:2] == ("GET", "/api/v1/repos/sam/joan/collaborators/alex/permission")
+
+
 def test_list_and_create_ssh_keys(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
     calls: list[tuple[str, str, dict]] = []

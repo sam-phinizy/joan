@@ -98,6 +98,16 @@ class ForgejoClient:
     def create_repo(self, name: str, private: bool = True) -> dict[str, Any]:
         return self._request_json("POST", "/api/v1/user/repos", json={"name": name, "private": private})
 
+    def get_current_user(self) -> dict[str, Any]:
+        return self._request_json("GET", "/api/v1/user")
+
+    def get_repo(self, owner: str, repo: str) -> dict[str, Any]:
+        return self._request_json("GET", f"/api/v1/repos/{owner}/{repo}")
+
+    def get_repo_collaborator_permission(self, owner: str, repo: str, username: str) -> dict[str, Any]:
+        path = f"/api/v1/repos/{owner}/{repo}/collaborators/{username}/permission"
+        return self._request_json("GET", path)
+
     def list_ssh_keys(self) -> list[dict[str, Any]]:
         data = self._request_json("GET", "/api/v1/user/keys")
         return list(data)
