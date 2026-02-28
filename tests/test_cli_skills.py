@@ -22,6 +22,7 @@ def test_skills_install_claude(tmp_path: Path, monkeypatch) -> None:
     assert (dest / "skills" / "joan-setup" / "SKILL.md").exists()
     assert (dest / "skills" / "joan-review" / "SKILL.md").exists()
     assert (dest / "skills" / "joan-resolve-pr-comments" / "SKILL.md").exists()
+    assert (dest / "skills" / "joan-plan" / "SKILL.md").exists()
     assert "Installed joan plugin for claude" in result.output
 
 
@@ -42,6 +43,7 @@ def test_skills_install_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert "Reinstalling" in result.output
     assert not sentinel.exists()
     assert (dest / ".claude-plugin" / "plugin.json").exists()
+    assert (dest / "skills" / "joan-plan" / "SKILL.md").exists()
 
 
 def test_skills_install_removes_legacy_skills_dir(tmp_path: Path, monkeypatch) -> None:
@@ -62,6 +64,7 @@ def test_skills_install_removes_legacy_skills_dir(tmp_path: Path, monkeypatch) -
     assert not (tmp_path / ".claude" / "skills" / "joan-setup").exists()
     assert not (tmp_path / ".claude" / "skills" / "joan-review").exists()
     assert (tmp_path / ".claude" / "plugins" / "joan" / ".claude-plugin" / "plugin.json").exists()
+    assert (tmp_path / ".claude" / "plugins" / "joan" / "skills" / "joan-plan" / "SKILL.md").exists()
 
 
 def test_skills_install_removes_legacy_plugin_dir(tmp_path: Path, monkeypatch) -> None:
@@ -79,6 +82,7 @@ def test_skills_install_removes_legacy_plugin_dir(tmp_path: Path, monkeypatch) -
     assert result.exit_code == 0, result.output
     # Global install should succeed (it replaces the legacy dir)
     assert (tmp_path / ".claude" / "plugins" / "joan" / ".claude-plugin" / "plugin.json").exists()
+    assert (tmp_path / ".claude" / "plugins" / "joan" / "skills" / "joan-plan" / "SKILL.md").exists()
 
 
 def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
@@ -94,6 +98,7 @@ def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
     assert (dest / "joan-setup" / "SKILL.md").exists()
     assert (dest / "joan-review" / "SKILL.md").exists()
     assert (dest / "joan-resolve-pr-comments" / "SKILL.md").exists()
+    assert (dest / "joan-plan" / "SKILL.md").exists()
     assert "Installed joan skills for codex" in result.output
 
 
@@ -114,6 +119,7 @@ def test_skills_install_codex_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert "Reinstalling" in result.output
     assert not sentinel.exists()
     assert (dest / "joan-setup" / "SKILL.md").exists()
+    assert (dest / "joan-plan" / "SKILL.md").exists()
 
 
 def test_skills_install_unknown_agent(tmp_path: Path, monkeypatch) -> None:

@@ -10,7 +10,7 @@ app = typer.Typer(help="Install or refresh Joan's agent-specific skills and plug
 
 _SUPPORTED_AGENTS = {"claude", "codex"}
 
-_CLAUDE_SKILL_NAMES = ("joan-setup", "joan-review", "joan-resolve-pr-comments")
+_CLAUDE_SKILL_NAMES = ("joan-setup", "joan-review", "joan-resolve-pr-comments", "joan-plan")
 
 
 def _install_dest(agent: str) -> Path:

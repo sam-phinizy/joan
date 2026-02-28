@@ -78,6 +78,7 @@ The Claude install places a full plugin bundle in `~/.claude/plugins/joan/`. Tha
 | `skills/joan-setup/SKILL.md` | Setup workflow guidance |
 | `skills/joan-review/SKILL.md` | End-to-end review workflow guidance |
 | `skills/joan-resolve-pr-comments/SKILL.md` | Guided PR comment resolution workflow |
+| `skills/joan-plan/SKILL.md` | Narrow workflow for putting an existing plan into Joan review |
 
 The `enforce-review-branch.sh` hook is intentionally narrow:
 
@@ -98,6 +99,7 @@ The Codex install places Joan skills in `$CODEX_HOME/skills/joan/` (default `~/.
 | `joan-setup` | Walks through one-time repo setup: verify Forgejo is running, run `joan init`, run `joan remote add`, and confirm `.joan/` is ignored |
 | `joan-review` | Covers the full review lifecycle: create a review branch, open a PR, check status/comments, finish an approved PR locally, and only push upstream when explicitly requested |
 | `joan-resolve-pr-comments` | Turns unresolved review comments into a step-by-step work queue, resolves actionable comments one at a time, and flags PR-level discussion comments that must be handled in Forgejo's UI |
+| `joan-plan` | Takes an already-formed plan and puts it into Joan's review flow without replacing your planning process |
 
 ### Repo layout for contributors
 
