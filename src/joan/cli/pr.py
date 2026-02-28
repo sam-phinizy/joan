@@ -29,8 +29,7 @@ app.add_typer(comment_app, name="comment")
 app.add_typer(review_app, name="review")
 
 
-@app.command("create", help="Create a PR from the current `joan-review/*` branch to its working branch on the review remote.")
-def pr_create(
+def _create_pr(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
     base: str | None = typer.Option(
@@ -65,6 +64,50 @@ def pr_create(
     if request_human_review and human_user and human_user != config.forgejo.owner:
         client.request_pr_reviewers(config.forgejo.owner, config.forgejo.repo, pr.number, [human_user])
     typer.echo(f"PR #{pr.number}: {pr.url}")
+
+
+@app.command("create", help="Create a PR from the current `joan-review/*` branch to its working branch on the review remote.")
+def pr_create(
+    title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
+    body: str | None = typer.Option(default=None, help="Optional PR body/description."),
+    base: str | None = typer.Option(
+        default=None,
+        help="Base branch. Defaults to the branch implied by the current `joan-review/*` branch.",
+    ),
+    request_human_review: bool = typer.Option(
+        True,
+        "--request-human-review/--no-request-human-review",
+        help="Request review from the configured human reviewer after opening the PR (default: on).",
+    ),
+) -> None:
+    _create_pr(
+        title=title,
+        body=body,
+        base=base,
+        request_human_review=request_human_review,
+    )
+
+
+@app.command("open", help="Alias for `create`.")
+def pr_open(
+    title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
+    body: str | None = typer.Option(default=None, help="Optional PR body/description."),
+    base: str | None = typer.Option(
+        default=None,
+        help="Base branch. Defaults to the branch implied by the current `joan-review/*` branch.",
+    ),
+    request_human_review: bool = typer.Option(
+        True,
+        "--request-human-review/--no-request-human-review",
+        help="Request review from the configured human reviewer after opening the PR (default: on).",
+    ),
+) -> None:
+    _create_pr(
+        title=title,
+        body=body,
+        base=base,
+        request_human_review=request_human_review,
+    )
 
 
 @app.command("sync", help="Read approval state and unresolved comment count for the open PR on the current branch.")

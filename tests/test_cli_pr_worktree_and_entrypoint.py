@@ -54,6 +54,37 @@ def test_pr_create(monkeypatch, sample_config) -> None:
     assert "PR #4" in result.output
 
 
+def test_pr_open_alias(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
+            return {
+                "number": 6,
+                "title": "t",
+                "html_url": "http://forgejo.local/pr/6",
+                "state": "open",
+                "head": {"ref": "joan-review/feat"},
+                "base": {"ref": "feat"},
+            }
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    result = runner.invoke(pr_mod.app, ["open"])
+
+    assert result.exit_code == 0
+    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
+    assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
+    assert "PR #6" in result.output
+
+
 def test_pr_create_requests_human_review_by_default(monkeypatch, sample_config) -> None:
     runner = CliRunner()
     sample_config.forgejo.human_user = "alex"
