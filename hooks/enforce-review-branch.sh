@@ -1,6 +1,7 @@
 #!/bin/bash
 # Blocks git commit when not on a joan review branch.
-# A review branch is one whose upstream tracks the joan-review remote.
+# A review branch is one whose upstream tracks the configured review remote
+# (read from .joan/config.toml [remotes] review, defaults to "joan-review").
 set -euo pipefail
 
 input=$(cat)
@@ -22,9 +23,17 @@ if [ ! -f ".joan/config.toml" ]; then
     exit 0
 fi
 
-# Allow if the current branch's upstream is on the joan-review remote
+# Read the review remote name from config (requires Python 3.11+ tomllib)
+review_remote=$(python3 -c "
+import tomllib, sys
+with open('.joan/config.toml', 'rb') as f:
+    config = tomllib.load(f)
+print(config.get('remotes', {}).get('review', 'joan-review'))
+" 2>/dev/null || echo "joan-review")
+
+# Allow if the current branch's upstream is on the review remote
 upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)
-if echo "$upstream" | grep -q "joan-review/"; then
+if echo "$upstream" | grep -q "^${review_remote}/"; then
     exit 0
 fi
 
