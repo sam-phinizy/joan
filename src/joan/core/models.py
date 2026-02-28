@@ -58,3 +58,42 @@ class PRSyncStatus:
     approved: bool
     unresolved_comments: int
     latest_review_state: str | None
+
+
+@dataclass(slots=True)
+class AgentForgejoConfig:
+    token: str
+
+
+@dataclass(slots=True)
+class AgentServerConfig:
+    port: int = 9000
+    host: str = "0.0.0.0"
+    webhook_secret: str = ""
+
+
+@dataclass(slots=True)
+class AgentClaudeConfig:
+    model: str = "claude-sonnet-4-6"
+
+
+def default_worker_command() -> list[str]:
+    return ["codex"]
+
+
+@dataclass(slots=True)
+class AgentWorkerConfig:
+    enabled: bool = False
+    api_url: str = ""
+    poll_interval_seconds: float = 2.0
+    timeout_seconds: float = 600.0
+    command: list[str] = field(default_factory=default_worker_command)
+
+
+@dataclass(slots=True)
+class AgentConfig:
+    name: str
+    forgejo: AgentForgejoConfig
+    server: AgentServerConfig = field(default_factory=AgentServerConfig)
+    claude: AgentClaudeConfig = field(default_factory=AgentClaudeConfig)
+    worker: AgentWorkerConfig = field(default_factory=AgentWorkerConfig)

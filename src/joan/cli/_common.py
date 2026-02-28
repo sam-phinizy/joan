@@ -7,6 +7,7 @@ import typer
 
 from joan.core.forgejo import parse_pr_response
 from joan.core.models import Config, PullRequest
+from joan.shell.agent_config_io import read_agent_config
 from joan.shell.config_io import read_config
 from joan.shell.forgejo_client import ForgejoClient, ForgejoError
 from joan.shell.git_runner import run_git
@@ -25,6 +26,18 @@ def load_config_or_exit() -> Config:
 
 def forgejo_client(config: Config) -> ForgejoClient:
     return ForgejoClient(config.forgejo.url, config.forgejo.token)
+
+
+def forgejo_client_for_agent_or_exit(config: Config, agent_name: str) -> ForgejoClient:
+    try:
+        agent_config = read_agent_config(agent_name, Path.cwd())
+    except FileNotFoundError:
+        typer.echo(f"Missing .joan/agents/{agent_name}.toml. Run `joan phil init` first.", err=True)
+        raise typer.Exit(code=2)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"Failed to read agent config '{agent_name}': {exc}", err=True)
+        raise typer.Exit(code=2)
+    return ForgejoClient(config.forgejo.url, agent_config.forgejo.token)
 
 
 def current_branch() -> str:

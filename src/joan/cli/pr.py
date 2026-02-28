@@ -4,7 +4,13 @@ import json
 
 import typer
 
-from joan.cli._common import current_branch, current_pr_or_exit, forgejo_client, load_config_or_exit
+from joan.cli._common import (
+    current_branch,
+    current_pr_or_exit,
+    forgejo_client,
+    forgejo_client_for_agent_or_exit,
+    load_config_or_exit,
+)
 from joan.core.forgejo import (
     build_create_pr_payload,
     compute_sync_status,
@@ -18,7 +24,9 @@ from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Manage pull requests on Forgejo.")
 comment_app = typer.Typer(help="Manage PR comments.")
+review_app = typer.Typer(help="Post reviews on PRs.")
 app.add_typer(comment_app, name="comment")
+app.add_typer(review_app, name="review")
 
 
 @app.command("create")
@@ -99,6 +107,26 @@ def pr_comment_resolve(comment_id: int) -> None:
     typer.echo(f"Resolved comment {comment_id}")
 
 
+@comment_app.command("add")
+def pr_comment_add(
+    agent: str = typer.Option(..., "--agent", help="Agent name whose token should be used"),
+    owner: str = typer.Option(..., "--owner", help="Forgejo repo owner"),
+    repo: str = typer.Option(..., "--repo", help="Forgejo repo name"),
+    pr: int = typer.Option(..., "--pr", help="Pull request number"),
+    path: str = typer.Option(..., "--path", help="Path within the pull request diff"),
+    line: int = typer.Option(..., "--line", help="New-side line number"),
+    body: str = typer.Option(..., "--body", help="Comment body"),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client_for_agent_or_exit(config, agent)
+    try:
+        client.create_inline_pr_comment(owner=owner, repo=repo, index=pr, path=path, line=line, body=body)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"Failed to post inline comment: {exc}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"Posted inline comment on PR #{pr}")
+
+
 @app.command("push")
 def pr_push() -> None:
     config = load_config_or_exit()
@@ -118,3 +146,94 @@ def pr_push() -> None:
     branch = current_branch()
     run_git(push_branch_args(config.remotes.upstream, branch, set_upstream=False))
     typer.echo(f"Pushed {branch} to {config.remotes.upstream}")
+
+
+@review_app.command("create")
+def pr_review_create(
+    json_input: str = typer.Option(..., "--json-input", help="Review JSON: {body, verdict, comments}"),
+) -> None:
+    try:
+        data = json.loads(json_input)
+    except json.JSONDecodeError as exc:
+        typer.echo(f"Invalid JSON: {exc}", err=True)
+        raise typer.Exit(code=2)
+
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    pr = current_pr_or_exit(config)
+
+    body = str(data.get("body", ""))
+    verdict = str(data.get("verdict", "comment"))
+    comments = list(data.get("comments", []))
+
+    client.create_review(
+        config.forgejo.owner,
+        config.forgejo.repo,
+        pr.number,
+        body=body,
+        verdict=verdict,
+        comments=comments,
+    )
+    typer.echo(f"Posted review ({verdict}) on PR #{pr.number}")
+
+
+@review_app.command("approve")
+def pr_review_approve(
+    body: str = typer.Option("", "--body", help="Review body"),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    pr = current_pr_or_exit(config)
+    client.create_review(
+        config.forgejo.owner,
+        config.forgejo.repo,
+        pr.number,
+        body=body,
+        verdict="approve",
+        comments=[],
+    )
+    typer.echo(f"Approved PR #{pr.number}")
+
+
+@review_app.command("request-changes")
+def pr_review_request_changes(
+    body: str = typer.Option("", "--body", help="Review body"),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    pr = current_pr_or_exit(config)
+    client.create_review(
+        config.forgejo.owner,
+        config.forgejo.repo,
+        pr.number,
+        body=body,
+        verdict="request_changes",
+        comments=[],
+    )
+    typer.echo(f"Requested changes on PR #{pr.number}")
+
+
+@review_app.command("submit")
+def pr_review_submit(
+    agent: str = typer.Option(..., "--agent", help="Agent name whose token should be used"),
+    owner: str = typer.Option(..., "--owner", help="Forgejo repo owner"),
+    repo: str = typer.Option(..., "--repo", help="Forgejo repo name"),
+    pr: int = typer.Option(..., "--pr", help="Pull request number"),
+    verdict: str = typer.Option(..., "--verdict", help="approve, request_changes, or comment"),
+    body: str = typer.Option("", "--body", help="Review body"),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client_for_agent_or_exit(config, agent)
+    try:
+        client.create_review(
+            owner=owner,
+            repo=repo,
+            index=pr,
+            body=body,
+            verdict=verdict,
+            comments=[],
+        )
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"Failed to post review: {exc}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"Posted review ({verdict}) on PR #{pr}")

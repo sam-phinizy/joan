@@ -10,6 +10,12 @@ class ForgejoError(RuntimeError):
 
 
 class ForgejoClient:
+    _VERDICT_MAP = {
+        "approve": "APPROVE",
+        "request_changes": "REQUEST_CHANGES",
+        "comment": "COMMENT",
+    }
+
     def __init__(self, base_url: str, token: str | None = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
@@ -95,6 +101,28 @@ class ForgejoClient:
         data = self._request_json("GET", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments")
         return list(data)
 
+    def create_inline_pr_comment(
+        self,
+        owner: str,
+        repo: str,
+        index: int,
+        path: str,
+        line: int,
+        body: str,
+    ) -> dict[str, Any]:
+        payload = {
+            "body": body,
+            "path": path,
+            "line": line,
+            "side": "RIGHT",
+        }
+        return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments", json=payload)
+
+    def get_pr_diff(self, owner: str, repo: str, index: int) -> str:
+        response = self._request_raw("GET", f"/api/v1/repos/{owner}/{repo}/pulls/{index}.diff")
+        self._raise_for_status(response)
+        return response.text
+
     def resolve_comment(self, owner: str, repo: str, index: int, comment_id: int) -> None:
         # Forgejo installations vary on thread resolution endpoints.
         primary = f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments/{comment_id}/resolve"
@@ -109,6 +137,23 @@ class ForgejoClient:
         response = self._request_raw("PATCH", fallback, json={"resolved": True})
         self._raise_for_status(response)
 
+    def create_review(
+        self,
+        owner: str,
+        repo: str,
+        index: int,
+        body: str,
+        verdict: str,
+        comments: list[dict],
+    ) -> dict[str, Any]:
+        event = self._VERDICT_MAP.get(verdict.lower(), "COMMENT")
+        payload: dict[str, Any] = {
+            "body": body,
+            "event": event,
+            "comments": comments,
+        }
+        return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/reviews", json=payload)
+
     def _request_json(self, method: str, path: str, **kwargs: Any) -> Any:
         response = self._request_raw(method, path, **kwargs)
         self._raise_for_status(response)
@@ -117,6 +162,9 @@ class ForgejoClient:
     def _request_raw(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         url = f"{self.base_url}{path}"
         headers = self._headers()
+        extra_headers = kwargs.pop("headers", None)
+        if extra_headers:
+            headers.update(extra_headers)
         with httpx.Client(timeout=30.0, headers=headers) as client:
             return client.request(method, url, **kwargs)
 

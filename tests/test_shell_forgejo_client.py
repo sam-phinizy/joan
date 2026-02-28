@@ -147,6 +147,84 @@ def test_resolve_comment_uses_fallback_on_primary_error(monkeypatch) -> None:
     assert fallback_calls[0][2]["json"] == {"resolved": True}
 
 
+def test_create_review_posts_correct_payload(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_request_json(self, method, path, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = kwargs.get("json", {})
+        return {"id": 99}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+
+    client = ForgejoClient("http://forgejo.local", "tok")
+    result = client.create_review(
+        owner="sam",
+        repo="joan",
+        index=7,
+        body="Looks mostly fine.",
+        verdict="request_changes",
+        comments=[{"path": "src/foo.py", "new_position": 10, "body": "This will break."}],
+    )
+
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/v1/repos/sam/joan/pulls/7/reviews"
+    assert captured["payload"]["event"] == "REQUEST_CHANGES"
+    assert captured["payload"]["body"] == "Looks mostly fine."
+    assert len(captured["payload"]["comments"]) == 1
+    assert result == {"id": 99}
+
+
+def test_create_review_approve_verdict(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_request_json(self, method, path, **kwargs):
+        captured["payload"] = kwargs.get("json", {})
+        return {}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+    client.create_review("sam", "joan", 7, body="lgtm", verdict="approve", comments=[])
+    assert captured["payload"]["event"] == "APPROVE"
+
+
+def test_create_inline_pr_comment_posts_correct_payload(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_request_json(self, method, path, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = kwargs.get("json", {})
+        return {"id": 12}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+    result = client.create_inline_pr_comment("sam", "joan", 7, "src/foo.py", 42, "This breaks.")
+
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/v1/repos/sam/joan/pulls/7/comments"
+    assert captured["payload"] == {
+        "body": "This breaks.",
+        "path": "src/foo.py",
+        "line": 42,
+        "side": "RIGHT",
+    }
+    assert result == {"id": 12}
+
+
+def test_get_pr_diff_returns_text(monkeypatch) -> None:
+    diff_text = "diff --git a/foo.py b/foo.py\n+new line"
+
+    def fake_request_raw(self, method, path, **kwargs):
+        return make_response(200, body=diff_text)
+
+    monkeypatch.setattr(ForgejoClient, "_request_raw", fake_request_raw)
+    client = ForgejoClient("http://forgejo.local", "tok")
+    result = client.get_pr_diff("sam", "joan", 7)
+    assert result == diff_text
+
+
 def test_create_user_via_admin(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local")
     calls: list[tuple[str, str, dict]] = []
