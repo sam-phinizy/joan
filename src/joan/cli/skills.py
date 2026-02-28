@@ -22,7 +22,15 @@ def _install_dest(agent: str) -> Path:
 
 def _source_for(agent: str) -> Path:
     if agent == "claude":
-        return Path(__file__).parent.parent / "data" / "claude-plugin"
+        marketplace = Path.home() / ".claude" / "plugins" / "marketplaces" / "joan"
+        if not marketplace.exists():
+            typer.echo(
+                "Joan marketplace clone not found at ~/.claude/plugins/marketplaces/joan.\n"
+                "Add the joan marketplace in Claude Code first, then re-run this command.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        return marketplace
     return Path(__file__).parent.parent / "data" / "codex-skills"
 
 
