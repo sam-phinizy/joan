@@ -98,6 +98,17 @@ class ForgejoClient:
     def create_repo(self, name: str, private: bool = True) -> dict[str, Any]:
         return self._request_json("POST", "/api/v1/user/repos", json={"name": name, "private": private})
 
+    def add_repo_collaborator(
+        self,
+        owner: str,
+        repo: str,
+        username: str,
+        permission: str = "admin",
+    ) -> None:
+        path = f"/api/v1/repos/{owner}/{repo}/collaborators/{username}"
+        response = self._request_raw("PUT", path, json={"permission": permission})
+        self._raise_for_status(response)
+
     def get_current_user(self) -> dict[str, Any]:
         return self._request_json("GET", "/api/v1/user")
 

@@ -19,7 +19,7 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import create_branch_args, push_branch_args, push_refspec_args
+from joan.core.git import push_branch_args, push_refspec_args, working_branch_for_review
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Manage pull requests on Forgejo.")
@@ -33,30 +33,21 @@ app.add_typer(review_app, name="review")
 def pr_create(
     title: str | None = typer.Option(default=None, help="PR title"),
     body: str | None = typer.Option(default=None, help="PR body"),
-    base: str | None = typer.Option(default=None, help="Base branch (defaults to joan/<original branch>)"),
+    base: str | None = typer.Option(default=None, help="Base branch (defaults to the working branch for this review branch)"),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
 
-    original_branch = current_branch()
-    branch = original_branch
-    if branch == "main":
-        branch = typer.prompt("Current branch is 'main'. Enter a new branch name").strip()
-        if not branch:
-            typer.echo("Branch name is required.", err=True)
-            raise typer.Exit(code=2)
-        run_git(create_branch_args(branch))
+    branch = current_branch()
+    resolved_base = base or working_branch_for_review(branch)
+    if not resolved_base:
+        typer.echo(
+            "Current branch is not a review branch. Use `joan branch create` first or pass `--base`.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
 
-    resolved_base = base or f"joan/{original_branch}"
-    if base is None:
-        upstream_ref = f"refs/remotes/{config.remotes.upstream}/{original_branch}"
-        source_ref = upstream_ref
-        try:
-            run_git(["show-ref", "--verify", "--quiet", upstream_ref])
-        except Exception:  # noqa: BLE001
-            source_ref = f"refs/heads/{original_branch}"
-        run_git(push_refspec_args(config.remotes.review, source_ref, f"refs/heads/{resolved_base}"))
-
+    run_git(push_branch_args(config.remotes.review, resolved_base, set_upstream=False))
     run_git(push_branch_args(config.remotes.review, branch, set_upstream=True))
 
     payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=body)
@@ -144,8 +135,8 @@ def pr_push() -> None:
         raise typer.Exit(code=1)
 
     branch = current_branch()
-    run_git(push_branch_args(config.remotes.upstream, branch, set_upstream=False))
-    typer.echo(f"Pushed {branch} to {config.remotes.upstream}")
+    run_git(push_refspec_args(config.remotes.upstream, branch, f"refs/heads/{pr.base_ref}"))
+    typer.echo(f"Pushed {branch} to {config.remotes.upstream}/{pr.base_ref}")
 
 
 @review_app.command("create")

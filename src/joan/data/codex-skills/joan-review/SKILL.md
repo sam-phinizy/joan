@@ -33,7 +33,7 @@ Before doing anything, figure out where you are in the review cycle:
    ```
    git rev-parse --abbrev-ref HEAD
    ```
-   If on `main`, ask the user for a new branch name, then create that branch before continuing.
+   If on `main`, stop and create a real working branch first. Joan review branches should be created from an existing non-`main` working branch.
 
 3. **Check for existing PR**:
    ```
@@ -45,7 +45,7 @@ Before doing anything, figure out where you are in the review cycle:
 **Routing summary:**
 | State | Action |
 |-------|--------|
-| On `main`, no PR | Sub-workflow A: Submit New Work (prompt for branch name first) |
+| On `main`, no PR | Create a working branch first, then continue with Sub-workflow A |
 | On branch, no PR | Create PR (step 3 of Sub-workflow A) |
 | PR exists, has unresolved comments or not approved | Sub-workflow B: Check & Address Feedback |
 | PR exists, approved, no unresolved comments | Sub-workflow C: Push Upstream |
@@ -62,11 +62,12 @@ Use this when starting fresh work that needs review.
 uv run joan branch create [name]
 ```
 
-If `[name]` is omitted, Joan generates one: `codex/work-YYYYMMDD-HHMMSS`. A descriptive name can be provided instead.
+If `[name]` is omitted, Joan creates `joan-review/<current-branch>` and checks it out.
+Joan also pushes the untouched current branch to Forgejo first so it can be used as the PR base.
 
 Output:
 ```
-Created and pushed branch: codex/work-20260227-143022
+Created review branch: joan-review/feature/add-in-cacheing (base: feature/add-in-cacheing)
 ```
 
 ### 2. Stage and commit changes
@@ -81,8 +82,8 @@ uv run joan pr create --title "Short description of changes" --body "Detailed ex
 
 - `--title` defaults to the branch name if omitted
 - `--body` is optional
-- `--base` defaults to `joan/<original-branch>`
-- If run from `main`, `joan pr create` prompts for a new working branch name and checks it out first
+- `--base` defaults to the base branch implied by `joan-review/<base-branch>`
+- If you're not on a `joan-review/...` branch, pass `--base` explicitly
 
 Output:
 ```
@@ -229,11 +230,11 @@ The branch is now on the upstream remote.
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `uv run joan branch create [name]` | Create review branch | `Created and pushed branch: {name}` |
+| `uv run joan branch create [name]` | Create review branch | `Created review branch: {review_branch} (base: {working_branch})` |
 | `uv run joan pr create --title "..." --body "..."` | Open PR on Forgejo | `PR #N: {url}` |
 | `uv run joan pr sync` | Check approval & comment status | JSON: `{approved, unresolved_comments, latest_review_state}` |
 | `uv run joan pr comments` | List unresolved comments | JSON array of comment objects |
 | `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
 | `uv run joan pr comment resolve <id>` | Mark comment as resolved | `Resolved comment <id>` |
-| `uv run joan pr push` | Push approved branch upstream | `Pushed {branch} to origin` |
+| `uv run joan pr push` | Push approved branch upstream | `Pushed {review_branch} to origin/{working_branch}` |
 | `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |

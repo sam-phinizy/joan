@@ -54,3 +54,15 @@ def infer_branch_name(hint: str | None = None) -> str:
         if safe:
             return f"codex/{safe}-{stamp}"
     return f"codex/work-{stamp}"
+
+
+def review_branch_name(base_branch: str) -> str:
+    return f"joan-review/{base_branch}"
+
+
+def working_branch_for_review(branch: str) -> str | None:
+    prefix = "joan-review/"
+    if not branch.startswith(prefix):
+        return None
+    base_branch = branch[len(prefix) :]
+    return base_branch or None

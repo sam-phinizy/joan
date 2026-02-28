@@ -127,30 +127,38 @@ def _check_forgejo(config: Config, results: list[CheckResult], user: str | None)
         else:
             _record(results, "warn", "Joan token can reach the review repo but does not report admin access.")
 
-    if not user:
+    effective_user = user or config.forgejo.human_user
+    if not effective_user:
         return
 
     try:
-        permission = client.get_repo_collaborator_permission(config.forgejo.owner, config.forgejo.repo, user)
+        permission = client.get_repo_collaborator_permission(
+            config.forgejo.owner,
+            config.forgejo.repo,
+            effective_user,
+        )
     except ForgejoError as exc:
         if "Forgejo API 404" in str(exc):
             _record(
                 results,
                 "fail",
-                f"Forgejo user '{user}' is not a collaborator on {config.forgejo.owner}/{config.forgejo.repo}.",
+                (
+                    f"Forgejo user '{effective_user}' is not a collaborator on "
+                    f"{config.forgejo.owner}/{config.forgejo.repo}."
+                ),
             )
             return
-        _record(results, "fail", f"Collaborator check failed for '{user}': {exc}")
+        _record(results, "fail", f"Collaborator check failed for '{effective_user}': {exc}")
         return
 
     access = str(permission.get("permission") or "").strip().lower()
     if access == "admin":
-        _record(results, "ok", f"Forgejo user '{user}' has admin access to the review repo.")
+        _record(results, "ok", f"Forgejo user '{effective_user}' has admin access to the review repo.")
         return
     if access:
-        _record(results, "fail", f"Forgejo user '{user}' has '{access}' access, not admin.")
+        _record(results, "fail", f"Forgejo user '{effective_user}' has '{access}' access, not admin.")
         return
-    _record(results, "warn", f"Forgejo did not report a permission level for user '{user}'.")
+    _record(results, "warn", f"Forgejo did not report a permission level for user '{effective_user}'.")
 
 
 @app.callback()

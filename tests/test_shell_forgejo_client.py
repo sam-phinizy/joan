@@ -109,6 +109,27 @@ def test_get_current_user_repo_and_collaborator_permission(monkeypatch) -> None:
     assert calls[2][:2] == ("GET", "/api/v1/repos/sam/joan/collaborators/alex/permission")
 
 
+def test_add_repo_collaborator_sends_permission(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_raw(method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        return make_response(204)
+
+    monkeypatch.setattr(client, "_request_raw", fake_request_raw)
+
+    client.add_repo_collaborator("joan", "demo", "sam")
+
+    assert calls == [
+        (
+            "PUT",
+            "/api/v1/repos/joan/demo/collaborators/sam",
+            {"json": {"permission": "admin"}},
+        )
+    ]
+
+
 def test_list_and_create_ssh_keys(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
     calls: list[tuple[str, str, dict]] = []

@@ -17,8 +17,23 @@ repo = "joan"
     config = parse_config(raw)
 
     assert config.forgejo.url == "http://localhost:3000"
+    assert config.forgejo.human_user is None
     assert config.remotes.review == "joan-review"
     assert config.remotes.upstream == "origin"
+
+
+def test_parse_config_accepts_optional_human_user() -> None:
+    raw = """
+[forgejo]
+url = "http://localhost:3000/"
+token = "abc"
+owner = "joan"
+repo = "demo"
+human_user = "sam"
+"""
+    config = parse_config(raw)
+
+    assert config.forgejo.human_user == "sam"
 
 
 def test_parse_config_invalid_toml() -> None:
@@ -43,6 +58,12 @@ def test_parse_config_invalid_remotes_type() -> None:
 def test_parse_config_requires_non_empty_fields() -> None:
     data = {"forgejo": {"url": "http://x", "token": "", "owner": "o", "repo": "r"}}
     with pytest.raises(ConfigError, match="forgejo.token is required"):
+        parse_config_dict(data)
+
+
+def test_parse_config_rejects_non_string_human_user() -> None:
+    data = {"forgejo": {"url": "http://x", "token": "t", "owner": "o", "repo": "r", "human_user": 1}}
+    with pytest.raises(ConfigError, match="forgejo.human_user must be a string"):
         parse_config_dict(data)
 
 

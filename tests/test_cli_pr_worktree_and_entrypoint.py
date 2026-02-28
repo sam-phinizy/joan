@@ -36,58 +36,33 @@ def test_pr_create(monkeypatch, sample_config) -> None:
                 "title": "t",
                 "html_url": "http://forgejo.local/pr/4",
                 "state": "open",
-                "head": {"ref": "feat"},
-                "base": {"ref": "joan/feat"},
+                "head": {"ref": "joan-review/feat"},
+                "base": {"ref": "feat"},
             }
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
-    monkeypatch.setattr(pr_mod, "current_branch", lambda: "feat")
-
-    def fake_run_git(args):
-        calls.append(args)
-        if args == ["show-ref", "--verify", "--quiet", "refs/remotes/origin/feat"]:
-            return ""
-        return ""
-
-    monkeypatch.setattr(pr_mod, "run_git", fake_run_git)
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
 
     result = runner.invoke(pr_mod.app, ["create"])
     assert result.exit_code == 0
-    assert ["push", "joan-review", "refs/remotes/origin/feat:refs/heads/joan/feat"] in calls
-    assert ["push", "-u", "joan-review", "feat"] in calls
-    assert captured["payload"] == {"title": "feat", "head": "feat", "base": "joan/feat"}
+    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
+    assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
     assert "PR #4" in result.output
 
 
-def test_pr_create_on_main_prompts_for_branch(monkeypatch, sample_config) -> None:
+def test_pr_create_requires_review_branch_without_base(monkeypatch, sample_config) -> None:
     runner = CliRunner()
-    calls: list[list[str]] = []
-    captured: dict[str, object] = {}
-
-    class FakeClient:
-        def create_pr(self, _owner, _repo, payload):
-            captured["payload"] = payload
-            return {
-                "number": 5,
-                "title": "feat/new",
-                "html_url": "http://forgejo.local/pr/5",
-                "state": "open",
-                "head": {"ref": "feat/new"},
-                "base": {"ref": "joan/main"},
-            }
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
-    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
-    monkeypatch.setattr(pr_mod, "current_branch", lambda: "main")
-    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: None)
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "feat")
 
-    result = runner.invoke(pr_mod.app, ["create"], input="feat/new\n")
-    assert result.exit_code == 0
-    assert ["checkout", "-b", "feat/new"] in calls
-    assert ["push", "joan-review", "refs/remotes/origin/main:refs/heads/joan/main"] in calls
-    assert ["push", "-u", "joan-review", "feat/new"] in calls
-    assert captured["payload"] == {"title": "feat/new", "head": "feat/new", "base": "joan/main"}
+    result = runner.invoke(pr_mod.app, ["create"])
+    assert result.exit_code == 2
+    assert "Current branch is not a review branch" in result.output
 
 
 def test_pr_sync(monkeypatch, sample_config, sample_pr) -> None:
@@ -154,8 +129,9 @@ def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:
             return self._comments
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    sample_pr.base_ref = "feat"
     monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg: sample_pr)
-    monkeypatch.setattr(pr_mod, "current_branch", lambda: "feat")
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
     monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
 
     monkeypatch.setattr(
@@ -189,7 +165,7 @@ def test_pr_push_approval_gates(monkeypatch, sample_config, sample_pr) -> None:
     )
     ok = runner.invoke(pr_mod.app, ["push"])
     assert ok.exit_code == 0
-    assert ["push", "origin", "feat"] in calls
+    assert ["push", "origin", "joan-review/feat:refs/heads/feat"] in calls
 
 
 def test_worktree_create_and_remove(monkeypatch, tmp_path: Path) -> None:

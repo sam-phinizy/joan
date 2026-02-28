@@ -12,7 +12,13 @@ from joan.core.models import Config, ForgejoConfig, RemotesConfig
 
 def make_config() -> Config:
     return Config(
-        forgejo=ForgejoConfig(url="http://forgejo.local", token="tok", owner="sam", repo="joan"),
+        forgejo=ForgejoConfig(
+            url="http://forgejo.local",
+            token="tok",
+            owner="joan",
+            repo="joan",
+            human_user="sam",
+        ),
         remotes=RemotesConfig(review="joan-review", upstream="origin"),
     )
 
@@ -52,6 +58,7 @@ def test_init_command(monkeypatch) -> None:
     assert "Next step" in result.output
     assert len(written_configs) == 1
     assert written_configs[0].forgejo.owner == "joan"
+    assert written_configs[0].forgejo.human_user == "sam"
 
 
 def test_init_command_reuses_existing_joan_user(monkeypatch) -> None:
@@ -132,14 +139,21 @@ def test_branch_create_with_generated_name(monkeypatch) -> None:
     calls: list[list[str]] = []
 
     monkeypatch.setattr(branch_mod, "load_config_or_exit", make_config)
-    monkeypatch.setattr(branch_mod, "infer_branch_name", lambda: "codex/new-1")
-    monkeypatch.setattr(branch_mod, "run_git", lambda args: calls.append(args) or "")
+    def fake_run_git(args):
+        calls.append(args)
+        if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+            return "feature/cache"
+        return ""
+
+    monkeypatch.setattr(branch_mod, "run_git", fake_run_git)
 
     result = runner.invoke(branch_mod.app, ["create"])
 
     assert result.exit_code == 0
-    assert calls[0] == ["checkout", "-b", "codex/new-1"]
-    assert calls[1] == ["push", "-u", "joan-review", "codex/new-1"]
+    assert calls[0] == ["rev-parse", "--abbrev-ref", "HEAD"]
+    assert calls[1] == ["push", "joan-review", "feature/cache"]
+    assert calls[2] == ["checkout", "-b", "joan-review/feature/cache"]
+    assert "Created review branch: joan-review/feature/cache (base: feature/cache)" in result.output
 
 
 def test_branch_push_current_branch(monkeypatch) -> None:
@@ -164,12 +178,19 @@ def test_remote_add_adds_remote_and_pushes(monkeypatch) -> None:
     monkeypatch.setattr(remote_mod, "load_config_or_exit", make_config)
 
     class FakeClient:
+        def __init__(self):
+            self.collaborator_calls: list[tuple[str, str, str, str]] = []
+
         def create_repo(self, **_kwargs):
-            return {"clone_url": "http://forgejo.local/sam/joan.git"}
+            return {"clone_url": "http://forgejo.local/joan/joan.git"}
+
+        def add_repo_collaborator(self, owner, repo, username, permission):
+            self.collaborator_calls.append((owner, repo, username, permission))
 
     import joan.cli._common as common_mod
 
-    monkeypatch.setattr(common_mod, "forgejo_client", lambda _cfg: FakeClient())
+    client = FakeClient()
+    monkeypatch.setattr(common_mod, "forgejo_client", lambda _cfg: client)
 
     def fake_run_git(args):
         calls.append(args)
@@ -183,7 +204,8 @@ def test_remote_add_adds_remote_and_pushes(monkeypatch) -> None:
 
     result = runner.invoke(remote_mod.app, [])
     assert result.exit_code == 0
-    assert ["remote", "add", "joan-review", "http://forgejo.local/sam/joan.git"] in calls
+    assert client.collaborator_calls == [("joan", "joan", "sam", "admin")]
+    assert ["remote", "add", "joan-review", "http://joan:tok@forgejo.local/joan/joan.git"] in calls
     assert ["push", "-u", "joan-review", "codex/new-1"] in calls
 
 
@@ -194,12 +216,19 @@ def test_remote_add_updates_existing_remote(monkeypatch) -> None:
     monkeypatch.setattr(remote_mod, "load_config_or_exit", make_config)
 
     class FakeClient:
+        def __init__(self):
+            self.collaborator_calls: list[tuple[str, str, str, str]] = []
+
         def create_repo(self, **_kwargs):
             return {}
 
+        def add_repo_collaborator(self, owner, repo, username, permission):
+            self.collaborator_calls.append((owner, repo, username, permission))
+
     import joan.cli._common as common_mod
 
-    monkeypatch.setattr(common_mod, "forgejo_client", lambda _cfg: FakeClient())
+    client = FakeClient()
+    monkeypatch.setattr(common_mod, "forgejo_client", lambda _cfg: client)
 
     def fake_run_git(args):
         calls.append(args)
@@ -213,9 +242,10 @@ def test_remote_add_updates_existing_remote(monkeypatch) -> None:
 
     result = runner.invoke(remote_mod.app, [])
     assert result.exit_code == 0
+    assert client.collaborator_calls == [("joan", "joan", "sam", "admin")]
     assert [
         "remote",
         "set-url",
         "joan-review",
-        "http://forgejo.local/sam/joan.git",
+        "http://joan:tok@forgejo.local/joan/joan.git",
     ] in calls

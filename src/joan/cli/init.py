@@ -68,7 +68,13 @@ def init_command() -> None:
     repo = typer.prompt("Forgejo repo", default=default_repo).strip()
 
     config = Config(
-        forgejo=ForgejoConfig(url=forgejo_url, token=token, owner=_JOAN_USERNAME, repo=repo),
+        forgejo=ForgejoConfig(
+            url=forgejo_url,
+            token=token,
+            owner=_JOAN_USERNAME,
+            repo=repo,
+            human_user=admin_username,
+        ),
         remotes=RemotesConfig(review="joan-review", upstream="origin"),
     )
     path = write_config(config, Path.cwd())

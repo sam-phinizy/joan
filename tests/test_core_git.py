@@ -21,6 +21,9 @@ def test_git_arg_builders() -> None:
     assert git_mod.remote_add_args("r", "u") == ["remote", "add", "r", "u"]
     assert git_mod.remote_set_url_args("r", "u") == ["remote", "set-url", "r", "u"]
     assert git_mod.list_remotes_args() == ["remote"]
+    assert git_mod.review_branch_name("feat") == "joan-review/feat"
+    assert git_mod.working_branch_for_review("joan-review/feat") == "feat"
+    assert git_mod.working_branch_for_review("feat") is None
 
 
 def test_infer_branch_name_with_hint(monkeypatch) -> None:

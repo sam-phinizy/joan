@@ -10,6 +10,7 @@ class ForgejoConfig:
     token: str
     owner: str
     repo: str
+    human_user: str | None = None
 
 
 @dataclass(slots=True)

@@ -15,6 +15,19 @@ def make_config() -> Config:
     )
 
 
+def make_config_with_human_user() -> Config:
+    return Config(
+        forgejo=ForgejoConfig(
+            url="http://forgejo.local",
+            token="tok",
+            owner="joan",
+            repo="demo",
+            human_user="sam",
+        ),
+        remotes=RemotesConfig(review="joan-review", upstream="origin"),
+    )
+
+
 def test_doctor_happy_path_with_user_check(monkeypatch) -> None:
     runner = CliRunner()
 
@@ -175,6 +188,44 @@ def test_doctor_reports_missing_collaborator(monkeypatch) -> None:
 
     assert result.exit_code == 1, result.output
     assert "is not a collaborator" in result.output
+
+
+def test_doctor_uses_configured_human_user_by_default(monkeypatch) -> None:
+    runner = CliRunner()
+
+    monkeypatch.setattr(doctor_mod, "read_config", lambda _cwd: make_config_with_human_user())
+
+    def fake_run_git(args):
+        if args == ["rev-parse", "--is-inside-work-tree"]:
+            return "true"
+        if args == ["remote"]:
+            return "joan-review\n"
+        if args == ["remote", "get-url", "joan-review"]:
+            return "http://joan:tok@forgejo.local/joan/demo.git"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(doctor_mod, "run_git", fake_run_git)
+
+    class FakeForgejoClient:
+        def __init__(self, _base_url, _token):
+            pass
+
+        def get_current_user(self):
+            return {"login": "joan"}
+
+        def get_repo(self, _owner, _repo):
+            return {"permissions": {"admin": True}}
+
+        def get_repo_collaborator_permission(self, owner, repo, username):
+            assert (owner, repo, username) == ("joan", "demo", "sam")
+            return {"permission": "admin"}
+
+    monkeypatch.setattr(doctor_mod, "ForgejoClient", FakeForgejoClient)
+
+    result = runner.invoke(doctor_mod.app, [])
+
+    assert result.exit_code == 0, result.output
+    assert "Forgejo user 'sam' has admin access" in result.output
 
 
 def test_root_cli_has_doctor_command() -> None:

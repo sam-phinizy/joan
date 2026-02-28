@@ -34,6 +34,16 @@ def remote_add() -> None:
             raise
         repo_data = {}
 
+    human_user = config.forgejo.human_user
+    if human_user and human_user != config.forgejo.owner:
+        client.add_repo_collaborator(
+            owner=config.forgejo.owner,
+            repo=config.forgejo.repo,
+            username=human_user,
+            permission="admin",
+        )
+        typer.echo(f"Granted admin access to Forgejo user '{human_user}'.")
+
     clone_url = str(repo_data.get("clone_url") or "")
     if not clone_url:
         clone_url = f"{config.forgejo.url}/{config.forgejo.owner}/{config.forgejo.repo}.git"
