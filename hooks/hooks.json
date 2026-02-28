@@ -1,0 +1,17 @@
+{
+  "description": "Enforce joan review-branch workflow: block git commit when not on a joan review branch",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PLUGIN_ROOT/hooks/enforce-review-branch.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
