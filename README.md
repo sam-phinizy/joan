@@ -10,6 +10,8 @@ agent commits → joan pr create → human reviews on Forgejo → joan pr finish
 
 Joan enforces approval gates at `joan pr finish`: it refuses to finish a PR if the review is not approved or has unresolved comments.
 
+Joan can also review plan documents without taking over how you create those plans. Use whatever process you prefer (human discussion, Superpowers, your own notes), then use Joan to put the finished draft into a review PR.
+
 ## Prerequisites
 
 - Python 3.13+
@@ -196,6 +198,18 @@ uv run joan pr push
 ```
 
 `uv run joan pr create` requests review from the configured human user by default. Pass `--no-request-human-review` if you need to skip that.
+
+## Planning
+
+Use your preferred planning workflow first, then let Joan review the resulting plan document:
+
+```bash
+uv run joan plan create cache-invalidation --title "Cache invalidation strategy"
+```
+
+This creates a plan file in `docs/plans/`, puts it on a dedicated review branch, and opens a PR for feedback by default.
+
+After the plan PR is approved, use `uv run joan pr finish` to land the plan locally. Implementation is a separate next step and only begins when you explicitly start it.
 
 ## Phil (Local AI Reviewer)
 

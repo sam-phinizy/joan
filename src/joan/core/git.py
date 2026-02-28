@@ -3,8 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 
-def create_branch_args(name: str) -> list[str]:
-    return ["checkout", "-b", name]
+def create_branch_args(name: str, start_point: str | None = None) -> list[str]:
+    args = ["checkout", "-b", name]
+    if start_point:
+        args.append(start_point)
+    return args
 
 
 def checkout_branch_args(name: str) -> list[str]:
@@ -64,7 +67,9 @@ def infer_branch_name(hint: str | None = None) -> str:
     return f"codex/work-{stamp}"
 
 
-def review_branch_name(base_branch: str) -> str:
+def review_branch_name(base_branch: str, topic: str | None = None) -> str:
+    if topic:
+        return f"joan-review/{base_branch}--{topic}"
     return f"joan-review/{base_branch}"
 
 
@@ -72,5 +77,5 @@ def working_branch_for_review(branch: str) -> str | None:
     prefix = "joan-review/"
     if not branch.startswith(prefix):
         return None
-    base_branch = branch[len(prefix) :]
+    base_branch = branch[len(prefix) :].split("--", 1)[0]
     return base_branch or None

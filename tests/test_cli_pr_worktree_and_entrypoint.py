@@ -18,6 +18,7 @@ def test_root_cli_has_expected_commands() -> None:
     assert "init" in result.output
     assert "remote" in result.output
     assert "branch" in result.output
+    assert "plan" in result.output
     assert "pr" in result.output
     assert "ssh" in result.output
     assert "worktree" in result.output
@@ -96,6 +97,40 @@ def test_pr_create_requests_human_review_by_default(monkeypatch, sample_config) 
         "repo": "joan",
         "index": 4,
         "reviewers": ["alex"],
+    }
+
+
+def test_pr_create_accepts_suffixed_review_branch(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
+            return {
+                "number": 5,
+                "title": "t",
+                "html_url": "http://forgejo.local/pr/5",
+                "state": "open",
+                "head": {"ref": "joan-review/feat--plan-cache"},
+                "base": {"ref": "feat"},
+            }
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat--plan-cache")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+
+    result = runner.invoke(pr_mod.app, ["create"])
+
+    assert result.exit_code == 0, result.output
+    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "-u", "joan-review", "joan-review/feat--plan-cache"] in calls
+    assert captured["payload"] == {
+        "title": "joan-review/feat--plan-cache",
+        "head": "joan-review/feat--plan-cache",
+        "base": "feat",
     }
 
 
@@ -294,6 +329,31 @@ def test_pr_push_requires_finished_branch(monkeypatch, sample_config) -> None:
 
     assert result.exit_code == 2
     assert "pr finish" in result.output
+
+
+def test_pr_finish_merges_suffixed_review_branch(monkeypatch, sample_config, sample_pr) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+
+    class FakeClient:
+        def get_reviews(self, *_args, **_kwargs):
+            return [{"id": 2, "state": "APPROVED", "user": {"login": "r"}}]
+
+        def get_comments(self, *_args, **_kwargs):
+            return [{"id": 1, "resolved": True, "user": {"login": "r"}}]
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    sample_pr.base_ref = "feat"
+    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg: sample_pr)
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat--plan-cache")
+    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+
+    result = runner.invoke(pr_mod.app, ["finish"])
+
+    assert result.exit_code == 0, result.output
+    assert ["checkout", "feat"] in calls
+    assert ["merge", "--ff-only", "joan-review/feat--plan-cache"] in calls
 
 
 def test_pr_push_pushes_current_branch(monkeypatch, sample_config) -> None:

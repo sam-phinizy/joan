@@ -7,6 +7,7 @@ import joan.core.git as git_mod
 
 def test_git_arg_builders() -> None:
     assert git_mod.create_branch_args("feat") == ["checkout", "-b", "feat"]
+    assert git_mod.create_branch_args("feat", "main") == ["checkout", "-b", "feat", "main"]
     assert git_mod.checkout_branch_args("feat") == ["checkout", "feat"]
     assert git_mod.merge_ff_only_args("topic") == ["merge", "--ff-only", "topic"]
     assert git_mod.push_branch_args("origin", "feat", set_upstream=True) == ["push", "-u", "origin", "feat"]
@@ -24,7 +25,9 @@ def test_git_arg_builders() -> None:
     assert git_mod.remote_set_url_args("r", "u") == ["remote", "set-url", "r", "u"]
     assert git_mod.list_remotes_args() == ["remote"]
     assert git_mod.review_branch_name("feat") == "joan-review/feat"
+    assert git_mod.review_branch_name("feat", "plan-cache") == "joan-review/feat--plan-cache"
     assert git_mod.working_branch_for_review("joan-review/feat") == "feat"
+    assert git_mod.working_branch_for_review("joan-review/feat--plan-cache") == "feat"
     assert git_mod.working_branch_for_review("feat") is None
 
 

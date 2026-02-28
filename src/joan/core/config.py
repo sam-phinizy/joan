@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tomllib
 
-from joan.core.models import Config, ForgejoConfig, GlobalConfig, RemotesConfig, RepoConfig
+from joan.core.models import Config, ForgejoConfig, GlobalConfig, PlanSettings, RemotesConfig, RepoConfig
 
 
 class ConfigError(ValueError):
@@ -37,6 +37,7 @@ def parse_config_dict(data: dict) -> Config:
 
     review = str(remotes_data.get("review", "joan-review"))
     upstream = str(remotes_data.get("upstream", "origin"))
+    plans = _parse_plan_settings(data)
 
     config = Config(
         forgejo=ForgejoConfig(
@@ -47,6 +48,7 @@ def parse_config_dict(data: dict) -> Config:
             human_user=human_user,
         ),
         remotes=RemotesConfig(review=review, upstream=upstream),
+        plans=plans,
     )
     validate_config(config)
     return config
@@ -65,21 +67,25 @@ def validate_config(config: Config) -> None:
 
 def config_to_dict(config: Config) -> dict:
     forgejo_data = {
-            "url": config.forgejo.url,
-            "token": config.forgejo.token,
-            "owner": config.forgejo.owner,
-            "repo": config.forgejo.repo,
+        "url": config.forgejo.url,
+        "token": config.forgejo.token,
+        "owner": config.forgejo.owner,
+        "repo": config.forgejo.repo,
     }
     if config.forgejo.human_user:
         forgejo_data["human_user"] = config.forgejo.human_user
 
-    return {
+    data = {
         "forgejo": forgejo_data,
         "remotes": {
             "review": config.remotes.review,
             "upstream": config.remotes.upstream,
         },
     }
+    plans_data = _plan_settings_to_dict(config.plans)
+    if plans_data is not None:
+        data["plans"] = plans_data
+    return data
 
 
 def _require_str(mapping: dict, key: str) -> str:
@@ -122,6 +128,7 @@ def parse_global_config(raw_toml: str) -> GlobalConfig:
         raise ConfigError("[remotes] must be a table")
     review = str(remotes_data.get("review", "joan-review"))
     upstream = str(remotes_data.get("upstream", "origin"))
+    plans = _parse_plan_settings(data)
 
     return GlobalConfig(
         url=url.rstrip("/"),
@@ -129,6 +136,7 @@ def parse_global_config(raw_toml: str) -> GlobalConfig:
         owner=owner,
         human_user=human_user,
         remotes=RemotesConfig(review=review, upstream=upstream),
+        plans=plans,
     )
 
 
@@ -154,12 +162,15 @@ def parse_repo_config(raw_toml: str) -> RepoConfig:
         upstream = str(remotes_data.get("upstream", "origin"))
         remotes = RemotesConfig(review=review, upstream=upstream)
 
-    return RepoConfig(repo=repo, human_user=human_user, remotes=remotes)
+    plans = _parse_plan_settings(data, allow_missing=True)
+
+    return RepoConfig(repo=repo, human_user=human_user, remotes=remotes, plans=plans)
 
 
 def merge_config(global_cfg: GlobalConfig, repo_cfg: RepoConfig) -> Config:
     human_user = repo_cfg.human_user if repo_cfg.human_user is not None else global_cfg.human_user
     remotes = repo_cfg.remotes if repo_cfg.remotes is not None else global_cfg.remotes
+    plans = repo_cfg.plans if repo_cfg.plans is not None else global_cfg.plans
     return Config(
         forgejo=ForgejoConfig(
             url=global_cfg.url,
@@ -169,6 +180,7 @@ def merge_config(global_cfg: GlobalConfig, repo_cfg: RepoConfig) -> Config:
             human_user=human_user,
         ),
         remotes=remotes,
+        plans=plans,
     )
 
 
@@ -180,13 +192,17 @@ def global_config_to_dict(cfg: GlobalConfig) -> dict:
     }
     if cfg.human_user:
         forgejo_data["human_user"] = cfg.human_user
-    return {
+    data = {
         "forgejo": forgejo_data,
         "remotes": {
             "review": cfg.remotes.review,
             "upstream": cfg.remotes.upstream,
         },
     }
+    plans_data = _plan_settings_to_dict(cfg.plans)
+    if plans_data is not None:
+        data["plans"] = plans_data
+    return data
 
 
 def repo_config_to_dict(cfg: RepoConfig) -> dict:
@@ -199,4 +215,42 @@ def repo_config_to_dict(cfg: RepoConfig) -> dict:
             "review": cfg.remotes.review,
             "upstream": cfg.remotes.upstream,
         }
+    if cfg.plans is not None:
+        plans_data = _plan_settings_to_dict(cfg.plans)
+        if plans_data is not None:
+            result["plans"] = plans_data
     return result
+
+
+def _parse_plan_settings(data: dict, allow_missing: bool = False) -> PlanSettings | None:
+    plans_data = data.get("plans")
+    if plans_data is None:
+        return None if allow_missing else PlanSettings()
+    if not isinstance(plans_data, dict):
+        raise ConfigError("[plans] must be a table")
+
+    directory = plans_data.get("directory", "docs/plans")
+    default_template = plans_data.get("default_template", "default")
+    if not isinstance(directory, str):
+        raise ConfigError("plans.directory must be a string")
+    if not isinstance(default_template, str):
+        raise ConfigError("plans.default_template must be a string")
+
+    normalized_directory = directory.strip()
+    normalized_template = default_template.strip()
+    if not normalized_directory:
+        raise ConfigError("plans.directory cannot be empty")
+    if not normalized_template:
+        raise ConfigError("plans.default_template cannot be empty")
+
+    return PlanSettings(directory=normalized_directory, default_template=normalized_template)
+
+
+def _plan_settings_to_dict(plans: PlanSettings) -> dict | None:
+    defaults = PlanSettings()
+    if plans == defaults:
+        return None
+    return {
+        "directory": plans.directory,
+        "default_template": plans.default_template,
+    }

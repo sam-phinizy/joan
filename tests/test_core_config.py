@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from joan.core.config import ConfigError, config_to_dict, parse_config, parse_config_dict, validate_config
-from joan.core.models import Config, ForgejoConfig, RemotesConfig
+from joan.core.models import Config, ForgejoConfig, PlanSettings, RemotesConfig
 
 
 def test_parse_config_valid_with_defaults() -> None:
@@ -36,6 +36,23 @@ human_user = "sam"
     assert config.forgejo.human_user == "sam"
 
 
+def test_parse_config_accepts_optional_plan_settings() -> None:
+    raw = """
+[forgejo]
+url = "http://localhost:3000/"
+token = "abc"
+owner = "joan"
+repo = "demo"
+
+[plans]
+directory = "planning"
+default_template = "default"
+"""
+    config = parse_config(raw)
+
+    assert config.plans == PlanSettings(directory="planning", default_template="default")
+
+
 def test_parse_config_invalid_toml() -> None:
     with pytest.raises(ConfigError, match="invalid TOML"):
         parse_config("[forgejo")
@@ -52,6 +69,15 @@ def test_parse_config_invalid_remotes_type() -> None:
         "remotes": "nope",
     }
     with pytest.raises(ConfigError, match=r"\[remotes\] must be a table"):
+        parse_config_dict(data)
+
+
+def test_parse_config_invalid_plans_type() -> None:
+    data = {
+        "forgejo": {"url": "http://x", "token": "t", "owner": "o", "repo": "r"},
+        "plans": "nope",
+    }
+    with pytest.raises(ConfigError, match=r"\[plans\] must be a table"):
         parse_config_dict(data)
 
 

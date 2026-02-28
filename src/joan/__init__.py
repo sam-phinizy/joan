@@ -6,6 +6,7 @@ from joan.cli.branch import app as branch_app
 from joan.cli.doctor import app as doctor_app
 from joan.cli.forge import app as forge_app
 from joan.cli.init import app as init_app
+from joan.cli.plan import app as plan_app
 from joan.cli.phil import app as phil_app
 from joan.cli.pr import app as pr_app
 from joan.cli.remote import app as remote_app
@@ -22,6 +23,7 @@ app = typer.Typer(
 app.add_typer(init_app)
 app.add_typer(doctor_app, name="doctor")
 app.add_typer(phil_app, name="phil")
+app.add_typer(plan_app, name="plan")
 app.add_typer(remote_app, name="remote")
 app.add_typer(branch_app, name="branch")
 app.add_typer(pr_app, name="pr")

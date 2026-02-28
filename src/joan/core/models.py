@@ -20,9 +20,16 @@ class RemotesConfig:
 
 
 @dataclass(slots=True)
+class PlanSettings:
+    directory: str = "docs/plans"
+    default_template: str = "default"
+
+
+@dataclass(slots=True)
 class Config:
     forgejo: ForgejoConfig
     remotes: RemotesConfig = field(default_factory=RemotesConfig)
+    plans: PlanSettings = field(default_factory=PlanSettings)
 
 
 @dataclass(slots=True)
@@ -32,6 +39,7 @@ class GlobalConfig:
     owner: str = "joan"
     human_user: str | None = None
     remotes: RemotesConfig = field(default_factory=RemotesConfig)
+    plans: PlanSettings = field(default_factory=PlanSettings)
 
 
 @dataclass(slots=True)
@@ -39,6 +47,7 @@ class RepoConfig:
     repo: str
     human_user: str | None = None
     remotes: RemotesConfig | None = None
+    plans: PlanSettings | None = None
 
 
 @dataclass(slots=True)
