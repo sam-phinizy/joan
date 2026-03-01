@@ -51,8 +51,7 @@ Before doing anything, figure out where you are in the review cycle:
 |-------|--------|
 | On `main`, no PR | Create a working branch first, then continue with Sub-workflow A |
 | On branch, no PR | Start Sub-workflow A at step 1: create a Joan review branch, then create the PR |
-| PR exists, has unresolved comments or not approved | Sub-workflow B: Check & Address Feedback |
-| PR exists, approved by the human reviewer, no unresolved comments | Sub-workflow C: Finish PR Locally |
+| PR exists | Invoke `/joan:joan-resolve-pr` — it handles all review states |
 
 ---
 
@@ -104,106 +103,15 @@ Tell the user the Forgejo URL so they can review the PR in the web UI.
 
 ## Sub-workflow B: Check & Address Feedback
 
-Use this when a PR exists and you need to check for or address review comments.
-
-### 1. Sync PR status
-
-```
-uv run joan pr sync
-```
-
-JSON output:
-```json
-{
-  "approved": false,
-  "unresolved_comments": 3,
-  "latest_review_state": "REQUESTED_CHANGES"
-}
-```
-
-Fields:
-- `approved`: `true` if any review granted approval
-- `unresolved_comments`: count of unresolved review comments
-- `latest_review_state`: `"APPROVED"`, `"REQUESTED_CHANGES"`, `"COMMENTED"`, or `null`
-
-If `approved` is `true` and `unresolved_comments` is `0`, skip to Sub-workflow C and complete the local review flow with `uv run joan pr finish` instead of stopping at status reporting.
-
-### 2. Fetch unresolved comments
+Use this when a PR exists. Invoke the `joan-resolve-pr` skill — it handles the
+full state matrix: line comments, reviewer-requested changes with a body,
+PR approval and finish, and no-actionable-feedback states.
 
 ```
-uv run joan pr comments
+/joan:joan-resolve-pr
 ```
 
-This includes both PR-level discussion comments and inline review comments.
-If you need to inspect a different PR than the one implied by the current branch, use one of:
-
-```
-uv run joan pr comments --pr <number>
-uv run joan pr comments --branch <latest-review-branch>
-```
-
-Prefer `--branch` when you know the latest review branch you want, but you are not currently checked out on it.
-
-JSON output (array of unresolved comments):
-```json
-[
-  {
-    "id": 42,
-    "body": "This function should handle the error case",
-    "path": "src/handler.py",
-    "line": 15,
-    "resolved": false,
-    "author": "reviewer-username",
-    "created_at": "2026-02-27T10:00:00Z"
-  }
-]
-```
-
-Use `--all` to include already-resolved comments if you need full context.
-
-Fields:
-- `id`: comment ID (used to resolve it later)
-- `body`: the reviewer's feedback
-- `path`: file path the comment refers to
-- `line`: line number (can be `null` for PR-level comments)
-- `resolved`: always `false` in default output
-- `author`: who wrote the comment
-- `created_at`: ISO 8601 timestamp
-
-### 3. Address each comment
-
-For each unresolved comment:
-
-1. **Read** the file at `path` around `line` to understand the context
-2. **Make the requested change** — edit the code to address the feedback
-3. **Resolve the comment**:
-   ```
-   uv run joan pr comment resolve <id>
-   ```
-   Output: `Resolved comment <id>`
-
-`uv run joan pr comment resolve` still applies to the current branch's active PR. If you inspected comments with `--pr` or `--branch`, switch to that PR's working branch before resolving comments.
-
-Work through comments one at a time. This ensures each resolution is deliberate and traceable.
-
-**Important:** If a comment is a discussion or question (not an actionable code change), surface it to the user rather than auto-resolving it. Only resolve comments where you've made a concrete change.
-
-### 4. Commit and push
-
-After addressing all comments, commit the changes and push:
-```
-git add <changed-files>
-git commit -m "Address review feedback"
-uv run joan branch push
-```
-
-### 5. Re-check status
-
-```
-uv run joan pr sync
-```
-
-Verify `unresolved_comments` is `0`. If there are still unresolved comments, repeat from step 2. If the reviewer hasn't re-approved yet, tell the user the PR is ready for another look.
+Do not replicate the resolution logic here. `joan-resolve-pr` owns it.
 
 ---
 
@@ -265,6 +173,7 @@ Run this from the finished base branch (for example `main`), not from the `joan-
 | `uv run joan pr create --title "..." --body "..."` | Open PR on Forgejo and request the configured human reviewer by default | `PR #N: {url}` |
 | `uv run joan pr sync` | Check approval & comment status | JSON: `{approved, unresolved_comments, latest_review_state}` |
 | `uv run joan pr comments` | List unresolved PR-level and inline review comments for the current PR | JSON array of comment objects |
+| `uv run joan pr reviews` | List review submissions with body and state | JSON array: `[{id, state, body, author, submitted_at}]` |
 | `uv run joan pr comments --pr N` | List unresolved comments for a specific PR | JSON array of comment objects |
 | `uv run joan pr comments --branch <name>` | List unresolved comments for the open PR on a specific branch | JSON array of comment objects |
 | `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
