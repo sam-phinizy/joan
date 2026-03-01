@@ -36,8 +36,8 @@ def sample_pr() -> PullRequest:
 @pytest.fixture
 def sample_reviews() -> list[Review]:
     return [
-        Review(id=1, state="COMMENTED", submitted_at=datetime(2026, 2, 27, tzinfo=UTC), user="r1"),
-        Review(id=2, state="APPROVED", submitted_at=datetime(2026, 2, 27, tzinfo=UTC), user="r2"),
+        Review(id=1, state="COMMENTED", body="", submitted_at=datetime(2026, 2, 27, tzinfo=UTC), user="r1"),
+        Review(id=2, state="APPROVED", body="", submitted_at=datetime(2026, 2, 27, tzinfo=UTC), user="r2"),
     ]
 
 

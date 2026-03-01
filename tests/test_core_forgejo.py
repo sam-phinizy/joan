@@ -79,8 +79,8 @@ def test_parse_reviews_and_comments() -> None:
 
 def test_compute_sync_status() -> None:
     reviews = [
-        Review(id=1, state="COMMENTED", submitted_at=None, user="a"),
-        Review(id=2, state="APPROVED", submitted_at=None, user="b"),
+        Review(id=1, state="COMMENTED", body="", submitted_at=None, user="a"),
+        Review(id=2, state="APPROVED", body="", submitted_at=None, user="b"),
     ]
     comments = [
         Comment(id=1, body="x", path="f", line=1, resolved=False, author="a", created_at=None),

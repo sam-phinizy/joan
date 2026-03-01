@@ -33,6 +33,7 @@ def parse_reviews(raw_reviews: list[dict]) -> list[Review]:
         Review(
             id=int(item["id"]),
             state=str(item.get("state", "")),
+            body=str(item.get("body", "")),
             submitted_at=_parse_dt(item.get("submitted_at")),
             user=str(item.get("user", {}).get("login", "")),
         )

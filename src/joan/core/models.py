@@ -64,6 +64,7 @@ class PullRequest:
 class Review:
     id: int
     state: str
+    body: str
     submitted_at: datetime | None
     user: str
 
