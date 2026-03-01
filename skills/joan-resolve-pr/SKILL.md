@@ -106,7 +106,20 @@ git commit -m "Address review feedback"
 uv run joan branch push
 ```
 
-### 5. Re-sync
+### 5. Update PR and notify reviewer
+
+Invoke `joan-pr-comment` to:
+1. Append a "Changes (Round N)" section to the PR description summarizing
+   what was addressed this cycle.
+2. Post a general comment:
+   ```
+   Addressed review feedback — pushed changes for re-review.
+
+   Changes made:
+   - <bullet per resolved comment>
+   ```
+
+### 6. Re-sync
 
 ```
 uv run joan pr sync
@@ -170,7 +183,20 @@ git commit -m "Implement reviewer-requested changes"
 uv run joan branch push
 ```
 
-### 5. Re-sync
+### 5. Update PR and notify reviewer
+
+Invoke `joan-pr-comment` to:
+1. Append a "Changes (Round N)" section to the PR description summarizing
+   what was implemented.
+2. Post a general comment:
+   ```
+   Implemented requested changes — pushed for re-review.
+
+   Changes made:
+   - <bullet per change>
+   ```
+
+### 6. Re-sync
 
 ```
 uv run joan pr sync
@@ -215,3 +241,5 @@ uv run joan pr push
 | `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |
 | `uv run joan pr finish` | Merge approved review branch into local base branch | `Merged {review_branch} into local {base_branch}` |
 | `uv run joan pr push` | Push finished base branch upstream (run from base branch) | `Pushed {branch} to origin/{branch}` |
+| `uv run joan pr comment post --body "..."` | Post a general discussion comment on the PR | `Posted comment on PR #N` |
+| `uv run joan pr update --body "..."` | Update the PR description | `Updated PR #N description` |
