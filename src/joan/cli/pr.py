@@ -258,6 +258,17 @@ def pr_push() -> None:
     typer.echo(f"Pushed {branch} to {config.remotes.upstream}/{branch}")
 
 
+@app.command("update", help="Update the description of the current branch's open PR.")
+def pr_update(
+    body: str = typer.Option(..., "--body", help="New PR description/body text."),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    pr = current_pr_or_exit(config)
+    client.update_pr(config.forgejo.owner, config.forgejo.repo, pr.number, body)
+    typer.echo(f"Updated PR #{pr.number} description")
+
+
 @review_app.command("create", help="Post a review from JSON to the current branch's active PR.")
 def pr_review_create(
     json_input: str = typer.Option(
