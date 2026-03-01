@@ -51,7 +51,7 @@ Joan can install agent-specific instructions that teach the Joan review workflow
 # Claude Code plugin (run in each repo where Claude should use Joan)
 uv run joan skills install --agent claude
 
-# Codex skills (installs to $CODEX_HOME/skills/joan, default: ~/.codex/skills/joan)
+# Codex skills (installs each Joan skill into ~/.agents/skills/)
 uv run joan skills install --agent codex
 
 # Same Codex install directly from GitHub without adding Joan as a dependency
@@ -59,7 +59,7 @@ uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --age
 ```
 
 - Claude install target: `~/.claude/plugins/joan/` (global, shared across all repos)
-- Codex install target: `$CODEX_HOME/skills/joan/` (defaults to `~/.codex/skills/joan/`)
+- Codex install target: `~/.agents/skills/` (one directory per Joan skill)
 
 ## Bundled Hooks And Skills
 
@@ -92,7 +92,7 @@ In practice, this prevents accidental commits on `main` or another non-review br
 
 ### Codex skills bundle
 
-The Codex install places Joan skills in `$CODEX_HOME/skills/joan/` (default `~/.codex/skills/joan/`). Codex gets the same four workflow skills, without the Claude-specific hook/plugin wrapper:
+The Codex install places Joan skills in `~/.agents/skills/`. Codex gets the same four workflow skills, without the Claude-specific hook/plugin wrapper:
 
 | Skill | Purpose |
 |---------|-------------|
@@ -106,8 +106,15 @@ The Codex install places Joan skills in `$CODEX_HOME/skills/joan/` (default `~/.
 If you are editing Joan itself, the checked-in integration assets live in:
 
 - `hooks/` for the Claude hook definition and shell script
-- `skills/` for the human-readable skill files used in the Claude plugin bundle
-- `src/joan/data/codex-skills/` for the packaged Codex skill assets that `joan skills install --agent codex` copies into `$CODEX_HOME`
+- `skills/` as the canonical authored skill tree
+- `.agents/skills/` as the repo-local Codex mirror for automatic discovery
+- `src/joan/data/codex-skills/` as the packaged Codex mirror that `joan skills install --agent codex` copies into `~/.agents/skills/`
+
+After editing anything under `skills/`, refresh both Codex mirrors:
+
+```bash
+uv run python scripts/sync_skills.py
+```
 
 ### Start Forgejo
 

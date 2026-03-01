@@ -16,8 +16,7 @@ _CLAUDE_SKILL_NAMES = ("joan-setup", "joan-review", "joan-resolve-pr-comments", 
 def _install_dest(agent: str) -> Path:
     if agent == "claude":
         return Path.home() / ".claude" / "plugins" / "joan"
-    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
-    return codex_home / "skills" / "joan"
+    return Path.home() / ".agents" / "skills"
 
 
 def _source_for(agent: str) -> Path:
@@ -51,6 +50,21 @@ def _remove_legacy_claude(cwd: Path) -> None:
         typer.echo(f"Removed legacy per-repo skills from {cwd / '.claude' / 'skills'}.")
 
 
+def _remove_codex_legacy_install() -> None:
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    legacy = codex_home / "skills" / "joan"
+    if legacy.exists():
+        shutil.rmtree(legacy)
+        typer.echo(f"Removed legacy Codex install from {legacy}.")
+
+
+def _remove_tree(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
 @app.command("install", help="Install Joan's Claude plugin or Codex skills into the standard global location for that agent.")
 def skills_install(
     agent: str = typer.Option(
@@ -80,9 +94,20 @@ def skills_install(
         shutil.copytree(src, dest)
         typer.echo(f"Installed joan plugin for {agent} at {dest}")
     else:
-        if dest.exists():
-            typer.echo(f"Existing install found at {dest}. Reinstalling...")
-            shutil.rmtree(dest)
+        _remove_codex_legacy_install()
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(src, dest)
+        dest.mkdir(parents=True, exist_ok=True)
+
+        skill_dirs = sorted(path for path in src.iterdir() if path.is_dir())
+        reinstalling = False
+        for skill_dir in skill_dirs:
+            skill_dest = dest / skill_dir.name
+            if skill_dest.exists():
+                reinstalling = True
+                _remove_tree(skill_dest)
+            shutil.copytree(skill_dir, skill_dest)
+
+        if reinstalling:
+            typer.echo(f"Existing Joan Codex skills found in {dest}. Reinstalling...")
+
         typer.echo(f"Installed joan skills for {agent} at {dest}")

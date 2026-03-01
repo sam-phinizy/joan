@@ -87,13 +87,12 @@ def test_skills_install_removes_legacy_plugin_dir(tmp_path: Path, monkeypatch) -
 
 def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
-    codex_home = tmp_path / ".codex-home"
-    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.setattr(skills_mod.Path, "home", lambda: tmp_path)
 
     result = runner.invoke(skills_mod.app, ["--agent", "codex"])
 
     assert result.exit_code == 0, result.output
-    dest = codex_home / "skills" / "joan"
+    dest = tmp_path / ".agents" / "skills"
     assert dest.is_dir()
     assert (dest / "joan-setup" / "SKILL.md").exists()
     assert (dest / "joan-review" / "SKILL.md").exists()
@@ -104,13 +103,12 @@ def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
 
 def test_skills_install_codex_reinstall(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
-    codex_home = tmp_path / ".codex-home"
-    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.setattr(skills_mod.Path, "home", lambda: tmp_path)
 
     runner.invoke(skills_mod.app, ["--agent", "codex"])
 
-    dest = codex_home / "skills" / "joan"
-    sentinel = dest / "stale_file.txt"
+    dest = tmp_path / ".agents" / "skills"
+    sentinel = dest / "joan-plan" / "stale_file.txt"
     sentinel.write_text("old")
 
     result = runner.invoke(skills_mod.app, ["--agent", "codex"])
@@ -120,6 +118,36 @@ def test_skills_install_codex_reinstall(tmp_path: Path, monkeypatch) -> None:
     assert not sentinel.exists()
     assert (dest / "joan-setup" / "SKILL.md").exists()
     assert (dest / "joan-plan" / "SKILL.md").exists()
+
+
+def test_skills_install_codex_preserves_unrelated_user_skill(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    monkeypatch.setattr(skills_mod.Path, "home", lambda: tmp_path)
+
+    other_skill = tmp_path / ".agents" / "skills" / "other-skill"
+    other_skill.mkdir(parents=True)
+    (other_skill / "SKILL.md").write_text("custom")
+
+    result = runner.invoke(skills_mod.app, ["--agent", "codex"])
+
+    assert result.exit_code == 0, result.output
+    assert (other_skill / "SKILL.md").read_text() == "custom"
+
+
+def test_skills_install_codex_removes_legacy_bundle(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    monkeypatch.setattr(skills_mod.Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / ".codex-home"))
+
+    legacy = tmp_path / ".codex-home" / "skills" / "joan"
+    legacy.mkdir(parents=True)
+    (legacy / "stale_file.txt").write_text("old")
+
+    result = runner.invoke(skills_mod.app, ["--agent", "codex"])
+
+    assert result.exit_code == 0, result.output
+    assert not legacy.exists()
+    assert "legacy Codex install" in result.output
 
 
 def test_skills_install_unknown_agent(tmp_path: Path, monkeypatch) -> None:
