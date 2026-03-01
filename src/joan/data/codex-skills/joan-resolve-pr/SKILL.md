@@ -2,10 +2,10 @@
 name: joan-resolve-pr
 description: >-
   Resolve a Joan PR in its current state. Use when the user wants to address
-  review feedback, implement reviewer-requested changes, resolve line comments,
-  finish an approved PR locally, or advance a PR that is stuck after all
-  comments were resolved but the reviewer has not re-approved. Handles the full
-  state matrix: line comments, review body instructions, and final approval.
+  review feedback, implement reviewer-requested changes from a review body,
+  resolve line comments, finish an approved PR locally, or determine next steps
+  when the PR has no actionable feedback. Handles the full state matrix: line
+  comments, review body instructions, formal approval, and no-feedback states.
 ---
 
 # Joan Resolve PR
@@ -43,9 +43,10 @@ Route to the correct sub-workflow based on what you see:
 
 | State | Action |
 |-------|--------|
-| `unresolved_comments > 0` | Sub-workflow A: Resolve Line Comments |
+| `unresolved_comments > 0` | Sub-workflow A: Resolve Line Comments (even if approved — resolve comments first) |
 | `latest_review_state = "REQUESTED_CHANGES"`, `unresolved_comments = 0` | Sub-workflow B: Implement from Review Body |
 | `approved = true`, `unresolved_comments = 0` | Sub-workflow C: Finish PR |
+| `latest_review_state = "COMMENTED"` or `null`, `unresolved_comments = 0` | No actionable feedback — tell the user the PR is awaiting formal review |
 
 ---
 
@@ -82,6 +83,9 @@ For each comment:
    discussion comment that cannot be resolved via the API. Tell the user which
    IDs need manual resolution and give them the Forgejo PR URL. Continue with
    the next comment.
+
+   Note: resolving a comment in Forgejo is a bookkeeping step. The actual code
+   changes only reach the reviewer once you push in step 4.
 
 Stop and ask the user before resolving a comment if:
 - the change is ambiguous
@@ -192,5 +196,22 @@ Merged joan-review/feature-x into local main
 The reviewed changes are now on the original local base branch. They are not
 pushed upstream.
 
-Only if the user explicitly wants to publish later, remind them they can run
-`uv run joan pr push` from the finished base branch as a separate step.
+Only if the user explicitly wants to publish later, remind them to switch to
+the finished base branch first (not the `joan-review/...` branch), then run:
+```bash
+uv run joan pr push
+```
+
+---
+
+## Quick Reference
+
+| Command | Purpose | Output |
+|---------|---------|--------|
+| `uv run joan pr sync` | Check approval and comment state | JSON: `{approved, unresolved_comments, latest_review_state}` |
+| `uv run joan pr comments` | List unresolved PR-level and inline comments | JSON array of comment objects |
+| `uv run joan pr reviews` | List review submissions with body text | JSON array: `[{id, state, body, author, submitted_at}]` |
+| `uv run joan pr comment resolve <id>` | Mark a comment resolved | `Resolved comment <id>` |
+| `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |
+| `uv run joan pr finish` | Merge approved review branch into local base branch | `Merged {review_branch} into local {base_branch}` |
+| `uv run joan pr push` | Push finished base branch upstream (run from base branch) | `Pushed {branch} to origin/{branch}` |
