@@ -43,7 +43,7 @@ Before doing anything, figure out where you are in the review cycle:
    ```
    uv run joan pr sync
    ```
-   - If this succeeds with JSON output → there's an active PR. Check its state to decide between Sub-workflow B or C.
+   - If this succeeds with JSON output → there's an active PR. Go to Sub-workflow B.
    - If this fails with "No open PR found" → no PR exists yet. Go to Sub-workflow A.
 
 **Routing summary:**
@@ -113,46 +113,6 @@ PR approval and finish, and no-actionable-feedback states.
 
 Do not replicate the resolution logic here. `joan-resolve-pr` owns it.
 
----
-
-## Sub-workflow C: Finish PR Locally
-
-Use this when the PR is approved by the human reviewer and all comments are resolved. Do not stop after confirming approval; finish the review workflow by running `uv run joan pr finish`. This merges the approved review branch back into the original base branch locally only. It does not push to GitHub.
-
-### 1. Verify readiness
-
-Run `uv run joan pr sync` and confirm:
-- `"approved": true`
-- `"unresolved_comments": 0`
-
-### 2. Finish
-
-```
-uv run joan pr finish
-```
-
-This command enforces approval gates internally. If the PR is not approved or has unresolved comments, it exits with code 1 and an error message:
-- `PR is not approved on Forgejo.`
-- `PR has N unresolved comments.`
-
-On success:
-```
-Merged joan-review/feature-x into local main
-```
-
-The reviewed changes are now applied back to the original local base branch. They are not pushed upstream yet.
-
-### 3. Optional later push
-
-Only when the user explicitly wants to publish the finished local branch upstream, run:
-```
-uv run joan pr push
-```
-
-Run this from the finished base branch (for example `main`), not from the `joan-review/...` branch.
-
----
-
 ## Rules
 
 1. **Never push to `origin` directly.** When the user wants to publish upstream, use `uv run joan pr push` instead.
@@ -160,8 +120,7 @@ Run this from the finished base branch (for example `main`), not from the `joan-
 3. **Resolve comments one at a time** as you address each one, not in bulk at the end.
 4. **Discussion comments go to the user.** If a comment is a question or discussion point (not an actionable change request), surface it to the user and let them decide how to handle it. Do not auto-resolve.
 5. **Check state before acting.** Always run `uv run joan pr sync` to understand where you are before starting work.
-6. **Approval is not the stopping point.** When the PR is approved by the human reviewer and there are no unresolved comments, immediately run `uv run joan pr finish` so the reviewed changes land on the original local base branch.
-7. **Upstream push is separate.** Do not push to GitHub as part of finishing a PR. Only run `uv run joan pr push` later if the user explicitly wants the finished branch published upstream.
+6. **Upstream push is separate.** Do not push to GitHub as part of finishing a PR. Only run `uv run joan pr push` later if the user explicitly wants the finished branch published upstream.
 
 ---
 
