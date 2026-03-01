@@ -53,6 +53,7 @@ def test_parse_reviews_and_comments() -> None:
             {
                 "id": 1,
                 "state": "APPROVED",
+                "body": "some body text",
                 "submitted_at": "2026-02-27T00:00:00Z",
                 "user": {"login": "sam"},
             }
@@ -73,6 +74,7 @@ def test_parse_reviews_and_comments() -> None:
     )
 
     assert reviews[0].submitted_at == datetime(2026, 2, 27, 0, 0, tzinfo=UTC)
+    assert reviews[0].body == "some body text"
     assert comments[0].created_at == datetime(2026, 2, 27, 0, 0, tzinfo=UTC)
     assert comments[0].author == "reviewer"
 
