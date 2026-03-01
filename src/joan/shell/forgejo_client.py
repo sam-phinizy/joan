@@ -198,6 +198,10 @@ class ForgejoClient:
         }
         return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments", json=payload)
 
+    def create_issue_comment(self, owner: str, repo: str, index: int, body: str) -> dict[str, Any]:
+        payload = {"body": body}
+        return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/issues/{index}/comments", json=payload)
+
     def get_pr_diff(self, owner: str, repo: str, index: int) -> str:
         response = self._request_raw("GET", f"/api/v1/repos/{owner}/{repo}/pulls/{index}.diff")
         self._raise_for_status(response)

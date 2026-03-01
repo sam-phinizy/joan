@@ -429,6 +429,25 @@ def test_create_token_with_admin_auth(monkeypatch) -> None:
     assert holder["auth"] == ("admin", "adminpw")
 
 
+def test_create_issue_comment_posts_to_issues_endpoint(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_request_json(self, method, path, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = kwargs.get("json", {})
+        return {"id": 42}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+    result = client.create_issue_comment("sam", "joan", 7, "Great work!")
+
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/v1/repos/sam/joan/issues/7/comments"
+    assert captured["payload"] == {"body": "Great work!"}
+    assert result == {"id": 42}
+
+
 def test_raise_for_status_truncates_long_body() -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
     long_body = "x" * 300
