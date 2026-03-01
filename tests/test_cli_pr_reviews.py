@@ -10,7 +10,10 @@ def test_pr_reviews_outputs_json(monkeypatch, sample_config, sample_pr) -> None:
     runner = CliRunner()
 
     class FakeClient:
-        def get_reviews(self, _owner, _repo, _index):
+        def get_reviews(self, owner, repo, index):
+            assert owner == "sam"
+            assert repo == "joan"
+            assert index == 7  # sample_pr.number
             return [
                 {
                     "id": 7,
@@ -33,3 +36,19 @@ def test_pr_reviews_outputs_json(monkeypatch, sample_config, sample_pr) -> None:
     assert payload[0]["body"] == "Please refactor the auth module"
     assert payload[0]["author"] == "reviewer"
     assert payload[0]["state"] == "REQUEST_CHANGES"
+
+
+def test_pr_reviews_empty_list(monkeypatch, sample_config, sample_pr) -> None:
+    runner = CliRunner()
+
+    class FakeClient:
+        def get_reviews(self, _owner, _repo, _index):
+            return []
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg, **_kw: sample_pr)
+
+    result = runner.invoke(pr_mod.app, ["reviews"])
+    assert result.exit_code == 0
+    assert json.loads(result.output) == []

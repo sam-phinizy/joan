@@ -165,7 +165,7 @@ def pr_comments(
     typer.echo(format_comments_json(comments, include_resolved=all_comments))
 
 
-@app.command("reviews", help="List review submissions (with body text) for the open PR on the current branch.")
+@app.command("reviews", help="List review submissions (with body text) for the open PR on the current branch. Use `pr sync` to check review state for a different PR.")
 def pr_reviews() -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
