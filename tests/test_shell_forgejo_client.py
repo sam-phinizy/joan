@@ -291,8 +291,8 @@ def test_resolve_comment_uses_fallback_on_primary_error(monkeypatch) -> None:
 
     client.resolve_comment("sam", "joan", 1, 9)
     assert fallback_calls[0][0] == "PATCH"
-    assert fallback_calls[0][1].endswith("/pulls/comments/9")
-    assert fallback_calls[0][2]["json"] == {"resolved": True}
+    assert fallback_calls[0][1].endswith("/issues/comments/9")
+    assert fallback_calls[0][2]["json"] == {"state": "closed"}
 
 
 def test_create_review_posts_correct_payload(monkeypatch) -> None:

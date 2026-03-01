@@ -206,7 +206,7 @@ class ForgejoClient:
     def resolve_comment(self, owner: str, repo: str, index: int, comment_id: int) -> None:
         # Forgejo installations vary on thread resolution endpoints.
         primary = f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments/{comment_id}/resolve"
-        fallback = f"/api/v1/repos/{owner}/{repo}/pulls/comments/{comment_id}"
+        fallback = f"/api/v1/repos/{owner}/{repo}/issues/comments/{comment_id}"
 
         try:
             self._request_json("POST", primary)
@@ -214,7 +214,7 @@ class ForgejoClient:
         except ForgejoError:
             pass
 
-        response = self._request_raw("PATCH", fallback, json={"resolved": True})
+        response = self._request_raw("PATCH", fallback, json={"state": "closed"})
         self._raise_for_status(response)
 
     def create_review(
