@@ -15,6 +15,7 @@ from joan.core.forgejo import (
     build_create_pr_payload,
     compute_sync_status,
     format_comments_json,
+    format_reviews_json,
     parse_comments,
     parse_pr_response,
     parse_reviews,
@@ -162,6 +163,16 @@ def pr_comments(
 
     comments = parse_comments(client.get_comments(config.forgejo.owner, config.forgejo.repo, pr.number))
     typer.echo(format_comments_json(comments, include_resolved=all_comments))
+
+
+@app.command("reviews", help="List review submissions (with body text) for the open PR on the current branch.")
+def pr_reviews() -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    pr = current_pr_or_exit(config)
+
+    reviews = parse_reviews(client.get_reviews(config.forgejo.owner, config.forgejo.repo, pr.number))
+    typer.echo(format_reviews_json(reviews))
 
 
 @comment_app.command("resolve")
