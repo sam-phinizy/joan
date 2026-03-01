@@ -21,7 +21,7 @@ def test_skills_install_claude(tmp_path: Path, monkeypatch) -> None:
     assert (dest / ".claude-plugin" / "plugin.json").exists()
     assert (dest / "skills" / "joan-setup" / "SKILL.md").exists()
     assert (dest / "skills" / "joan-review" / "SKILL.md").exists()
-    assert (dest / "skills" / "joan-resolve-pr-comments" / "SKILL.md").exists()
+    assert (dest / "skills" / "joan-resolve-pr" / "SKILL.md").exists()
     assert (dest / "skills" / "joan-plan" / "SKILL.md").exists()
     assert "Installed joan plugin for claude" in result.output
 
@@ -97,7 +97,7 @@ def test_skills_install_codex(tmp_path: Path, monkeypatch) -> None:
     assert dest.is_dir()
     assert (dest / "joan-setup" / "SKILL.md").exists()
     assert (dest / "joan-review" / "SKILL.md").exists()
-    assert (dest / "joan-resolve-pr-comments" / "SKILL.md").exists()
+    assert (dest / "joan-resolve-pr" / "SKILL.md").exists()
     assert (dest / "joan-plan" / "SKILL.md").exists()
     assert "Installed joan skills for codex" in result.output
 
