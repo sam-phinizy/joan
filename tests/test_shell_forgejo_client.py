@@ -448,6 +448,25 @@ def test_create_issue_comment_posts_to_issues_endpoint(monkeypatch) -> None:
     assert result == {"id": 42}
 
 
+def test_update_pr_patches_pull_body(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_request_json(self, method, path, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = kwargs.get("json", {})
+        return {"number": 7, "body": "updated body"}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+    result = client.update_pr("sam", "joan", 7, "updated body")
+
+    assert captured["method"] == "PATCH"
+    assert captured["path"] == "/api/v1/repos/sam/joan/pulls/7"
+    assert captured["payload"] == {"body": "updated body"}
+    assert result["number"] == 7
+
+
 def test_raise_for_status_truncates_long_body() -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
     long_body = "x" * 300
