@@ -133,14 +133,12 @@ def test_parse_dt_handles_invalid_values() -> None:
 
 
 def test_format_reviews_json_returns_expected_shape() -> None:
-    from datetime import datetime, timezone
-
     reviews = [
         Review(
             id=7,
             state="REQUESTED_CHANGES",
             body="Please fix the auth module",
-            submitted_at=datetime(2026, 2, 28, 14, 0, 0, tzinfo=timezone.utc),
+            submitted_at=datetime(2026, 2, 28, 14, 0, 0, tzinfo=UTC),
             user="reviewer",
         )
     ]
@@ -158,6 +156,9 @@ def test_format_reviews_json_handles_none_submitted_at() -> None:
         Review(id=3, state="APPROVED", body="", submitted_at=None, user="reviewer")
     ]
     payload = json.loads(format_reviews_json(reviews))
+    assert payload[0]["id"] == 3
+    assert payload[0]["state"] == "APPROVED"
+    assert payload[0]["author"] == "reviewer"
     assert payload[0]["body"] == ""
     assert payload[0]["submitted_at"] is None
 

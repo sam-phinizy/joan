@@ -92,7 +92,7 @@ def format_reviews_json(reviews: list[Review]) -> str:
             "id": r.id,
             "state": r.state,
             "body": r.body,
-            "author": r.user,
+            "author": r.user,  # normalized to "author" to match format_comments_json output shape
             "submitted_at": r.submitted_at.isoformat().replace("+00:00", "Z") if r.submitted_at else None,
         }
         for r in reviews
