@@ -187,6 +187,17 @@ def pr_comment_resolve(
     typer.echo(f"Resolved comment {comment_id}")
 
 
+@comment_app.command("post")
+def pr_comment_post(
+    body: str = typer.Option(..., "--body", help="Comment text to post on the current PR."),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    pr = current_pr_or_exit(config)
+    client.create_issue_comment(config.forgejo.owner, config.forgejo.repo, pr.number, body)
+    typer.echo(f"Posted comment on PR #{pr.number}")
+
+
 @comment_app.command("add")
 def pr_comment_add(
     agent: str = typer.Option(..., "--agent", help="Agent name whose Forgejo token should be used."),

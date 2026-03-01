@@ -68,3 +68,34 @@ def test_pr_comment_add_uses_agent_client(monkeypatch) -> None:
             "body": "This breaks.",
         }
     ]
+
+
+def test_pr_comment_post_calls_create_issue_comment(monkeypatch) -> None:
+    runner = CliRunner()
+    config = make_config()
+    posted: list = []
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: config)
+
+    class FakePR:
+        number = 5
+        title = "test"
+        url = "http://forgejo.local/owner/repo/pulls/5"
+        state = "open"
+        head_ref = "joan-review/main"
+        base_ref = "main"
+
+    monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda cfg: FakePR())
+
+    class FakeClient:
+        def create_issue_comment(self, owner, repo, index, body):
+            posted.append({"owner": owner, "repo": repo, "index": index, "body": body})
+            return {"id": 10}
+
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda cfg: FakeClient())
+
+    result = runner.invoke(pr_mod.app, ["comment", "post", "--body", "Hello reviewer!"])
+
+    assert result.exit_code == 0, result.output
+    assert "Posted comment on PR #5" in result.output
+    assert posted == [{"owner": "sam", "repo": "joan", "index": 5, "body": "Hello reviewer!"}]
