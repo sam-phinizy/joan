@@ -86,6 +86,20 @@ def format_comments_json(comments: list[Comment], include_resolved: bool = False
     return json.dumps(payload, indent=2)
 
 
+def format_reviews_json(reviews: list[Review]) -> str:
+    payload = [
+        {
+            "id": r.id,
+            "state": r.state,
+            "body": r.body,
+            "author": r.user,
+            "submitted_at": r.submitted_at.isoformat().replace("+00:00", "Z") if r.submitted_at else None,
+        }
+        for r in reviews
+    ]
+    return json.dumps(payload, indent=2)
+
+
 def _parse_dt(raw: str | None) -> datetime | None:
     if not raw:
         return None

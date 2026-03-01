@@ -9,6 +9,7 @@ from joan.core.forgejo import (
     build_create_repo_payload,
     compute_sync_status,
     format_comments_json,
+    format_reviews_json,
     parse_comments,
     parse_pr_response,
     parse_reviews,
@@ -129,3 +130,37 @@ def test_parse_dt_handles_invalid_values() -> None:
     assert _parse_dt(None) is None
     assert _parse_dt("") is None
     assert _parse_dt("not-a-date") is None
+
+
+def test_format_reviews_json_returns_expected_shape() -> None:
+    from datetime import datetime, timezone
+
+    reviews = [
+        Review(
+            id=7,
+            state="REQUESTED_CHANGES",
+            body="Please fix the auth module",
+            submitted_at=datetime(2026, 2, 28, 14, 0, 0, tzinfo=timezone.utc),
+            user="reviewer",
+        )
+    ]
+    payload = json.loads(format_reviews_json(reviews))
+    assert len(payload) == 1
+    assert payload[0]["id"] == 7
+    assert payload[0]["state"] == "REQUESTED_CHANGES"
+    assert payload[0]["body"] == "Please fix the auth module"
+    assert payload[0]["author"] == "reviewer"
+    assert payload[0]["submitted_at"] == "2026-02-28T14:00:00Z"
+
+
+def test_format_reviews_json_handles_none_submitted_at() -> None:
+    reviews = [
+        Review(id=3, state="APPROVED", body="", submitted_at=None, user="reviewer")
+    ]
+    payload = json.loads(format_reviews_json(reviews))
+    assert payload[0]["body"] == ""
+    assert payload[0]["submitted_at"] is None
+
+
+def test_format_reviews_json_empty_list() -> None:
+    assert json.loads(format_reviews_json([])) == []
