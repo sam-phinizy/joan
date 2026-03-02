@@ -43,9 +43,9 @@ Route to the correct sub-workflow based on what you see:
 
 | State | Action |
 |-------|--------|
-| `unresolved_comments > 0` | Sub-workflow A: Resolve Line Comments (even if approved — resolve comments first) |
+| `approved = true` | Sub-workflow C: Finish PR |
+| `unresolved_comments > 0` | Sub-workflow A: Resolve Line Comments |
 | `latest_review_state = "REQUESTED_CHANGES"`, `unresolved_comments = 0` | Sub-workflow B: Implement from Review Body |
-| `approved = true`, `unresolved_comments = 0` | Sub-workflow C: Finish PR |
 | `latest_review_state = "COMMENTED"` or `null`, `unresolved_comments = 0` | No actionable feedback — tell the user the PR is awaiting formal review |
 
 ---
@@ -126,7 +126,7 @@ uv run joan pr sync
 ```
 
 If `unresolved_comments` is still non-zero, repeat from step 1.
-If `approved = true` and `unresolved_comments = 0`, continue to Sub-workflow C.
+If `approved = true`, continue to Sub-workflow C.
 Otherwise, tell the user the PR is ready for re-review.
 
 ---
@@ -208,7 +208,7 @@ Tell the user the PR is ready for re-review.
 
 ## Sub-workflow C: Finish PR
 
-Use when `approved = true` and `unresolved_comments = 0`.
+Use when `approved = true`.
 
 ```
 uv run joan pr finish

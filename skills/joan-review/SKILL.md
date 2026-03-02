@@ -20,7 +20,7 @@ Joan gates all code through local Forgejo review before it reaches upstream (Git
 2. Open a PR on Forgejo
 3. Human reviews and leaves comments
 4. Agent addresses feedback and resolves comments
-5. Once approved by the human reviewer with no unresolved comments, immediately finish the review locally by merging the review branch back into the original base branch with `uv run joan pr finish`
+5. Once approved by the human reviewer, immediately finish the review locally by merging the review branch back into the original base branch with `uv run joan pr finish`
 6. Only push to GitHub later, as a separate explicit step, with `uv run joan pr push`
 
 All Joan data commands (`pr sync`, `pr comments`) output structured JSON to stdout.
