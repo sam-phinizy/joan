@@ -45,21 +45,28 @@ uvx --from git+https://github.com/sam-phinizy/joan.git joan --help
 
 ### Install agent integrations
 
-Joan can install agent-specific instructions that teach the Joan review workflow. Those skills only become available to the agent after you run the relevant `joan skills install` command.
+**Claude Code plugin (recommended):**
 
 ```bash
-# Claude Code plugin (run in each repo where Claude should use Joan)
-uv run joan skills install --agent claude
-
-# Codex skills (installs each Joan skill into ~/.agents/skills/)
-uv run joan skills install --agent codex
-
-# Same Codex install directly from GitHub without adding Joan as a dependency
-uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --agent codex
+/plugin marketplace add sam-phinizy/sams-claude-menagerie
+/plugin install joan@sams-claude-menagerie
 ```
 
-- Claude install target: `~/.claude/plugins/joan/` (global, shared across all repos)
-- Codex install target: `~/.agents/skills/` (one directory per Joan skill)
+To update later:
+
+```bash
+/plugin update joan@sams-claude-menagerie
+```
+
+**Codex skills:**
+
+```bash
+# Installs each Joan skill into ~/.agents/skills/
+uv run joan skills install --agent codex
+
+# Same install directly from GitHub without adding Joan as a dependency
+uvx --from git+https://github.com/sam-phinizy/joan.git joan skills install --agent codex
+```
 
 ## Bundled Hooks And Skills
 
