@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.metadata
+
 import typer
 
 from joan.cli.branch import app as branch_app
@@ -31,6 +33,12 @@ app.add_typer(ssh_app, name="ssh")
 app.add_typer(skills_app, name="skills")
 app.add_typer(worktree_app, name="worktree")
 app.add_typer(forge_app, name="forge")
+
+
+@app.command()
+def version() -> None:
+    """Print the installed joan version."""
+    typer.echo(importlib.metadata.version("joan"))
 
 
 def main() -> None:
