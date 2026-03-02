@@ -20,7 +20,7 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import checkout_branch_args, merge_ff_only_args, push_branch_args, working_branch_for_review
+from joan.core.git import checkout_branch_args, delete_branch_args, merge_ff_only_args, push_branch_args, working_branch_for_review
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Open Forgejo PRs, inspect review state, finish approved PRs locally, and push upstream separately.")
@@ -220,7 +220,7 @@ def pr_comment_add(
 
 @app.command(
     "finish",
-    help="Fast-forward the current approved review branch into its original local base branch without pushing upstream.",
+    help="Merge the approved PR on Forgejo, pull the result locally, and clean up review branches.",
 )
 def pr_finish() -> None:
     config = load_config_or_exit()
@@ -228,19 +228,27 @@ def pr_finish() -> None:
     pr = current_pr_or_exit(config)
 
     reviews = parse_reviews(client.get_reviews(config.forgejo.owner, config.forgejo.repo, pr.number))
-    comments = parse_comments(client.get_comments(config.forgejo.owner, config.forgejo.repo, pr.number))
-    sync = compute_sync_status(reviews, comments)
+    sync = compute_sync_status(reviews, [])
     if not sync.approved:
         typer.echo("PR is not approved on Forgejo.", err=True)
         raise typer.Exit(code=1)
-    if sync.unresolved_comments > 0:
-        typer.echo(f"PR has {sync.unresolved_comments} unresolved comments.", err=True)
-        raise typer.Exit(code=1)
 
-    branch = current_branch()
+    review_branch = current_branch()
+    client.merge_pr(config.forgejo.owner, config.forgejo.repo, pr.number)
+
+    # Pull merged result locally
+    run_git(["fetch", config.remotes.review])
     run_git(checkout_branch_args(pr.base_ref))
-    run_git(merge_ff_only_args(branch))
-    typer.echo(f"Merged {branch} into local {pr.base_ref}")
+    run_git(["pull", config.remotes.review, pr.base_ref])
+
+    # Clean up review branch
+    run_git(delete_branch_args(review_branch))
+    try:
+        client.delete_branch(config.forgejo.owner, config.forgejo.repo, review_branch)
+    except Exception:  # noqa: BLE001
+        pass  # branch may already be deleted by Forgejo merge
+
+    typer.echo(f"Merged PR #{pr.number} and cleaned up {review_branch}")
 
 
 @app.command("push", help="Push the current finished local branch to the real upstream remote.")

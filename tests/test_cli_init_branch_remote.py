@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import joan.cli.branch as branch_mod
+import joan.core.git as git_mod
 import joan.cli.init as init_mod
 import joan.cli.remote as remote_mod
 from joan.core.models import Config, ForgejoConfig, RemotesConfig
@@ -132,6 +133,8 @@ def test_branch_create_with_generated_name(monkeypatch) -> None:
     calls: list[list[str]] = []
 
     monkeypatch.setattr(branch_mod, "load_config_or_exit", make_config)
+    monkeypatch.setattr(git_mod, "_next_review_number", lambda _base: 1)
+
     def fake_run_git(args):
         calls.append(args)
         if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
@@ -145,8 +148,8 @@ def test_branch_create_with_generated_name(monkeypatch) -> None:
     assert result.exit_code == 0
     assert calls[0] == ["rev-parse", "--abbrev-ref", "HEAD"]
     assert calls[1] == ["push", "joan-review", "feature/cache"]
-    assert calls[2] == ["checkout", "-b", "joan-review/feature/cache"]
-    assert "Created review branch: joan-review/feature/cache (base: feature/cache)" in result.output
+    assert calls[2] == ["checkout", "-b", "joan-review/feature/cache--r1"]
+    assert "Created review branch: joan-review/feature/cache--r1 (base: feature/cache)" in result.output
 
 
 def test_branch_push_current_branch(monkeypatch) -> None:

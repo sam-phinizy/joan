@@ -225,6 +225,14 @@ class ForgejoClient:
         response = self._request_raw("PATCH", fallback, json={"state": "closed"})
         self._raise_for_status(response)
 
+    def merge_pr(self, owner: str, repo: str, index: int, method: str = "merge") -> dict[str, Any]:
+        payload = {"Do": method}
+        return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/pulls/{index}/merge", json=payload)
+
+    def delete_branch(self, owner: str, repo: str, branch: str) -> None:
+        response = self._request_raw("DELETE", f"/api/v1/repos/{owner}/{repo}/branches/{branch}")
+        self._raise_for_status(response)
+
     def create_review(
         self,
         owner: str,

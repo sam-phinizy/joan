@@ -70,7 +70,30 @@ def infer_branch_name(hint: str | None = None) -> str:
 def review_branch_name(base_branch: str, topic: str | None = None) -> str:
     if topic:
         return f"joan-review/{base_branch}--{topic}"
-    return f"joan-review/{base_branch}"
+    return f"joan-review/{base_branch}--r{_next_review_number(base_branch)}"
+
+
+def _next_review_number(base_branch: str) -> int:
+    import re
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "branch", "--list", f"joan-review/{base_branch}--r*"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    numbers = []
+    for line in result.stdout.splitlines():
+        branch = line.strip().lstrip("* ")
+        m = re.search(r"--r(\d+)$", branch)
+        if m:
+            numbers.append(int(m.group(1)))
+    return max(numbers, default=0) + 1
+
+
+def delete_branch_args(name: str) -> list[str]:
+    return ["branch", "-D", name]
 
 
 def working_branch_for_review(branch: str) -> str | None:

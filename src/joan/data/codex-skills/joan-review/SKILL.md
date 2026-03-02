@@ -20,7 +20,7 @@ Joan gates all code through local Forgejo review before it reaches upstream (Git
 2. Open a PR on Forgejo
 3. Human reviews and leaves comments
 4. Agent addresses feedback and resolves comments
-5. Once approved by the human reviewer, immediately finish the review locally by merging the review branch back into the original base branch with `uv run joan pr finish`
+5. Once approved by the human reviewer, immediately finish by merging the PR on Forgejo and cleaning up the review branch with `uv run joan pr finish`
 6. Only push to GitHub later, as a separate explicit step, with `uv run joan pr push`
 
 All Joan data commands (`pr sync`, `pr comments`) output structured JSON to stdout.
@@ -67,7 +67,7 @@ Always do this before `uv run joan pr create` unless you intentionally plan to p
 uv run joan branch create [name]
 ```
 
-If `[name]` is omitted, Joan creates `joan-review/<current-branch>` and checks it out.
+If `[name]` is omitted, Joan auto-generates `joan-review/<current-branch>--rN` (where N increments to avoid collisions) and checks it out.
 Joan also pushes the untouched current branch to Forgejo first so it can be used as the PR base.
 
 Output:
@@ -137,6 +137,6 @@ Do not replicate the resolution logic here. `joan-resolve-pr` owns it.
 | `uv run joan pr comments --branch <name>` | List unresolved comments for the open PR on a specific branch | JSON array of comment objects |
 | `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
 | `uv run joan pr comment resolve <id>` | Mark comment as resolved | `Resolved comment <id>` |
-| `uv run joan pr finish` | Merge an approved review branch back into its original local base branch | `Merged {review_branch} into local {working_branch}` |
+| `uv run joan pr finish` | Merge PR on Forgejo, pull result, clean up review branch | `Merged PR #N and cleaned up {review_branch}` |
 | `uv run joan pr push` | Push the current finished local branch upstream | `Pushed {branch} to origin/{branch}` |
 | `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |

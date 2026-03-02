@@ -216,14 +216,14 @@ uv run joan pr finish
 
 On success:
 ```
-Merged joan-review/feature-x into local main
+Merged PR #N and cleaned up joan-review/feature-x--r1
 ```
 
-The reviewed changes are now on the original local base branch. They are not
-pushed upstream.
+The PR is merged on Forgejo, the review branch is deleted (locally and on the
+remote), and the merged changes are pulled into the local base branch.
 
-Only if the user explicitly wants to publish later, remind them to switch to
-the finished base branch first (not the `joan-review/...` branch), then run:
+Only if the user explicitly wants to publish upstream later, switch to the base
+branch and run:
 ```bash
 uv run joan pr push
 ```
@@ -239,7 +239,7 @@ uv run joan pr push
 | `uv run joan pr reviews` | List review submissions with body text | JSON array: `[{id, state, body, author, submitted_at}]` |
 | `uv run joan pr comment resolve <id>` | Mark a comment resolved | `Resolved comment <id>` |
 | `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |
-| `uv run joan pr finish` | Merge approved review branch into local base branch | `Merged {review_branch} into local {base_branch}` |
+| `uv run joan pr finish` | Merge PR on Forgejo, pull result, clean up review branch | `Merged PR #N and cleaned up {review_branch}` |
 | `uv run joan pr push` | Push finished base branch upstream (run from base branch) | `Pushed {branch} to origin/{branch}` |
 | `uv run joan pr comment post --body "..."` | Post a general discussion comment on the PR | `Posted comment on PR #N` |
 | `uv run joan pr update --body "..."` | Update the PR description | `Updated PR #N description` |

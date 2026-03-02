@@ -24,11 +24,21 @@ def test_git_arg_builders() -> None:
     assert git_mod.remote_add_args("r", "u") == ["remote", "add", "r", "u"]
     assert git_mod.remote_set_url_args("r", "u") == ["remote", "set-url", "r", "u"]
     assert git_mod.list_remotes_args() == ["remote"]
-    assert git_mod.review_branch_name("feat") == "joan-review/feat"
     assert git_mod.review_branch_name("feat", "plan-cache") == "joan-review/feat--plan-cache"
+    assert git_mod.delete_branch_args("feat") == ["branch", "-D", "feat"]
     assert git_mod.working_branch_for_review("joan-review/feat") == "feat"
     assert git_mod.working_branch_for_review("joan-review/feat--plan-cache") == "feat"
     assert git_mod.working_branch_for_review("feat") is None
+
+
+def test_review_branch_name_auto_suffix(monkeypatch) -> None:
+    monkeypatch.setattr(git_mod, "_next_review_number", lambda _base: 3)
+    assert git_mod.review_branch_name("feat") == "joan-review/feat--r3"
+
+
+def test_working_branch_for_review_with_rN_suffix() -> None:
+    assert git_mod.working_branch_for_review("joan-review/feat--r1") == "feat"
+    assert git_mod.working_branch_for_review("joan-review/feat--r42") == "feat"
 
 
 def test_infer_branch_name_with_hint(monkeypatch) -> None:

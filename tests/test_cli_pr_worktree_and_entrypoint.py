@@ -297,17 +297,22 @@ def test_pr_comments_rejects_pr_and_branch_together(monkeypatch, sample_config) 
 def test_pr_finish_approval_gates_and_merges(monkeypatch, sample_config, sample_pr) -> None:
     runner = CliRunner()
     calls: list[list[str]] = []
+    merge_calls: list[tuple] = []
+    delete_calls: list[tuple] = []
 
     class FakeClient:
-        def __init__(self, reviews, comments):
+        def __init__(self, reviews):
             self._reviews = reviews
-            self._comments = comments
 
         def get_reviews(self, *_args, **_kwargs):
             return self._reviews
 
-        def get_comments(self, *_args, **_kwargs):
-            return self._comments
+        def merge_pr(self, owner, repo, index, method="merge"):
+            merge_calls.append((owner, repo, index, method))
+            return {}
+
+        def delete_branch(self, owner, repo, branch):
+            delete_calls.append((owner, repo, branch))
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     sample_pr.base_ref = "feat"
@@ -315,39 +320,35 @@ def test_pr_finish_approval_gates_and_merges(monkeypatch, sample_config, sample_
     monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
     monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
 
+    # Not approved → exit 1
     monkeypatch.setattr(
         pr_mod,
         "forgejo_client",
-        lambda _cfg: FakeClient(reviews=[{"id": 1, "state": "COMMENTED", "user": {"login": "r"}}], comments=[]),
+        lambda _cfg: FakeClient(reviews=[{"id": 1, "state": "COMMENTED", "user": {"login": "r"}}]),
     )
     not_approved = runner.invoke(pr_mod.app, ["finish"])
     assert not_approved.exit_code == 1
     assert "not approved" in not_approved.output
 
+    # Approved → merges on Forgejo and cleans up
+    calls.clear()
+    merge_calls.clear()
+    delete_calls.clear()
     monkeypatch.setattr(
         pr_mod,
         "forgejo_client",
         lambda _cfg: FakeClient(
             reviews=[{"id": 2, "state": "APPROVED", "user": {"login": "r"}}],
-            comments=[{"id": 1, "resolved": False, "user": {"login": "r"}}],
-        ),
-    )
-    unresolved = runner.invoke(pr_mod.app, ["finish"])
-    assert unresolved.exit_code == 1
-    assert "unresolved comments" in unresolved.output
-
-    monkeypatch.setattr(
-        pr_mod,
-        "forgejo_client",
-        lambda _cfg: FakeClient(
-            reviews=[{"id": 2, "state": "APPROVED", "user": {"login": "r"}}],
-            comments=[{"id": 1, "resolved": True, "user": {"login": "r"}}],
         ),
     )
     ok = runner.invoke(pr_mod.app, ["finish"])
-    assert ok.exit_code == 0
+    assert ok.exit_code == 0, ok.output
+    assert len(merge_calls) == 1
+    assert ["fetch", "joan-review"] in calls
     assert ["checkout", "feat"] in calls
-    assert ["merge", "--ff-only", "joan-review/feat"] in calls
+    assert ["pull", "joan-review", "feat"] in calls
+    assert ["branch", "-D", "joan-review/feat"] in calls
+    assert f"Merged PR #{sample_pr.number}" in ok.output
 
 
 def test_pr_push_requires_finished_branch(monkeypatch, sample_config) -> None:
@@ -370,8 +371,11 @@ def test_pr_finish_merges_suffixed_review_branch(monkeypatch, sample_config, sam
         def get_reviews(self, *_args, **_kwargs):
             return [{"id": 2, "state": "APPROVED", "user": {"login": "r"}}]
 
-        def get_comments(self, *_args, **_kwargs):
-            return [{"id": 1, "resolved": True, "user": {"login": "r"}}]
+        def merge_pr(self, *_args, **_kwargs):
+            return {}
+
+        def delete_branch(self, *_args, **_kwargs):
+            pass
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     sample_pr.base_ref = "feat"
@@ -384,7 +388,7 @@ def test_pr_finish_merges_suffixed_review_branch(monkeypatch, sample_config, sam
 
     assert result.exit_code == 0, result.output
     assert ["checkout", "feat"] in calls
-    assert ["merge", "--ff-only", "joan-review/feat--plan-cache"] in calls
+    assert ["branch", "-D", "joan-review/feat--plan-cache"] in calls
 
 
 def test_pr_push_pushes_current_branch(monkeypatch, sample_config) -> None:

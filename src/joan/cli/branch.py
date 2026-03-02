@@ -13,7 +13,7 @@ app = typer.Typer(help="Create and push `joan-review/*` branches for the local F
 def branch_create(
     name: str | None = typer.Argument(
         default=None,
-        help="Optional review branch name. Omit this to let Joan create `joan-review/<current-branch>`.",
+        help="Optional review branch name. Omit this to let Joan auto-generate `joan-review/<current-branch>--rN`.",
     )
 ) -> None:
     config = load_config_or_exit()
