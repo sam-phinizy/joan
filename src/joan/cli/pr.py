@@ -11,6 +11,7 @@ from joan.cli._common import (
     forgejo_client_for_agent_or_exit,
     load_config_or_exit,
 )
+from joan.core.branch_state import save_branch_state
 from joan.core.forgejo import (
     build_create_pr_payload,
     compute_sync_status,
@@ -20,7 +21,7 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import checkout_branch_args, delete_branch_args, merge_ff_only_args, push_branch_args, working_branch_for_review
+from joan.core.git import checkout_branch_args, delete_branch_args, merge_ff_only_args, push_branch_args, rev_parse_args, working_branch_for_review
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Open Forgejo PRs, inspect review state, finish approved PRs locally, and push upstream separately.")
@@ -55,7 +56,10 @@ def _create_pr(
         )
         raise typer.Exit(code=2)
 
-    run_git(push_branch_args(config.remotes.review, resolved_base, set_upstream=False))
+    # Only push the review (head) branch — the base branch was already
+    # pushed at the correct SHA by `joan branch create`.  Re-pushing it
+    # here would overwrite the remote base with the local ref (which
+    # points to HEAD), collapsing the diff back to zero.
     run_git(push_branch_args(config.remotes.review, branch, set_upstream=True))
 
     payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=body)
@@ -183,7 +187,13 @@ def pr_comment_resolve(
     client = forgejo_client(config)
     pr = current_pr_or_exit(config)
 
-    client.resolve_comment(config.forgejo.owner, config.forgejo.repo, pr.number, comment_id)
+    client.resolve_comment(
+        config.forgejo.owner,
+        config.forgejo.repo,
+        pr.number,
+        comment_id,
+        human_user=config.forgejo.human_user,
+    )
     typer.echo(f"Resolved comment {comment_id}")
 
 
@@ -247,6 +257,10 @@ def pr_finish() -> None:
         client.delete_branch(config.forgejo.owner, config.forgejo.repo, review_branch)
     except Exception:  # noqa: BLE001
         pass  # branch may already be deleted by Forgejo merge
+
+    # Update branch state so the next review round uses the current HEAD as base.
+    new_head = run_git(rev_parse_args("HEAD"))
+    save_branch_state(pr.base_ref, new_head)
 
     typer.echo(f"Merged PR #{pr.number} and cleaned up {review_branch}")
 

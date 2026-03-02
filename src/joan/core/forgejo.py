@@ -14,7 +14,7 @@ def build_create_pr_payload(title: str, head: str, base: str, body: str | None =
     payload = {"title": title, "head": head, "base": base}
     if body:
         payload["body"] = body
-    return payload
+    return {k: v for k, v in payload.items() if v is not None}
 
 
 def parse_pr_response(raw: dict) -> PullRequest:

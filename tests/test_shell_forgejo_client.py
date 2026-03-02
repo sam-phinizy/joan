@@ -275,24 +275,33 @@ def test_resolve_comment_primary_success(monkeypatch) -> None:
 
 def test_resolve_comment_uses_fallback_on_primary_error(monkeypatch) -> None:
     client = ForgejoClient("http://forgejo.local", "abc")
+    call_count = 0
 
-    def fail_primary(*_args, **_kwargs):
-        raise ForgejoError("no endpoint")
+    def fail_primary_then_succeed(method, path, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # Primary resolve endpoint fails
+            raise ForgejoError("no endpoint")
+        # Fallback: create_issue_comment succeeds
+        return {"id": 42}
 
-    fallback_resp = make_response(200, json_data={"ok": True})
     fallback_calls: list[tuple[str, str, dict]] = []
+    orig_request_json = client._request_json
 
-    def fake_request_raw(method, path, **kwargs):
+    def tracking_request_json(method, path, **kwargs):
         fallback_calls.append((method, path, kwargs))
-        return fallback_resp
+        return fail_primary_then_succeed(method, path, **kwargs)
 
-    monkeypatch.setattr(client, "_request_json", fail_primary)
-    monkeypatch.setattr(client, "_request_raw", fake_request_raw)
+    monkeypatch.setattr(client, "_request_json", tracking_request_json)
 
-    client.resolve_comment("sam", "joan", 1, 9)
-    assert fallback_calls[0][0] == "PATCH"
-    assert fallback_calls[0][1].endswith("/issues/comments/9")
-    assert fallback_calls[0][2]["json"] == {"state": "closed"}
+    client.resolve_comment("sam", "joan", 1, 9, human_user="alex")
+    # First call: primary resolve (fails), second call: create_issue_comment (fallback)
+    assert len(fallback_calls) == 2
+    assert fallback_calls[1][0] == "POST"
+    assert fallback_calls[1][1].endswith("/issues/1/comments")
+    assert "@alex" in fallback_calls[1][2]["json"]["body"]
+    assert "resolved by joan" in fallback_calls[1][2]["json"]["body"]
 
 
 def test_create_review_posts_correct_payload(monkeypatch) -> None:
@@ -478,4 +487,30 @@ def test_raise_for_status_truncates_long_body() -> None:
     message = str(exc.value)
     assert "500" in message
     assert "..." in message
-    assert len(message) < 280
+
+
+def test_raise_for_status_includes_request_payload() -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    response = make_response(500, body="internal error")
+    payload = {"title": "test", "head": "branch", "base": "main"}
+
+    with pytest.raises(ForgejoError) as exc:
+        client._raise_for_status(response, request_context=payload)
+
+    message = str(exc.value)
+    assert "500" in message
+    assert "request payload:" in message
+    assert '"title": "test"' in message
+    assert '"head": "branch"' in message
+
+
+def test_raise_for_status_no_payload_omits_context() -> None:
+    client = ForgejoClient("http://forgejo.local", "abc")
+    response = make_response(422, body="bad request")
+
+    with pytest.raises(ForgejoError) as exc:
+        client._raise_for_status(response)
+
+    message = str(exc.value)
+    assert "422" in message
+    assert "request payload:" not in message

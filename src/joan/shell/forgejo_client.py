@@ -211,10 +211,16 @@ class ForgejoClient:
         self._raise_for_status(response)
         return response.text
 
-    def resolve_comment(self, owner: str, repo: str, index: int, comment_id: int) -> None:
+    def resolve_comment(
+        self,
+        owner: str,
+        repo: str,
+        index: int,
+        comment_id: int,
+        human_user: str | None = None,
+    ) -> None:
         # Forgejo installations vary on thread resolution endpoints.
         primary = f"/api/v1/repos/{owner}/{repo}/pulls/{index}/comments/{comment_id}/resolve"
-        fallback = f"/api/v1/repos/{owner}/{repo}/issues/comments/{comment_id}"
 
         try:
             self._request_json("POST", primary)
@@ -222,8 +228,11 @@ class ForgejoClient:
         except ForgejoError:
             pass
 
-        response = self._request_raw("PATCH", fallback, json={"state": "closed"})
-        self._raise_for_status(response)
+        # Fallback: post a reply comment noting resolution instead of
+        # PATCHing the comment state (which 422s on PR-level discussions).
+        mention = f"@{human_user} " if human_user else ""
+        body = f"{mention}This comment has been marked as resolved by joan."
+        self.create_issue_comment(owner, repo, index, body)
 
     def merge_pr(self, owner: str, repo: str, index: int, method: str = "merge") -> dict[str, Any]:
         payload = {"Do": method}
@@ -252,7 +261,7 @@ class ForgejoClient:
 
     def _request_json(self, method: str, path: str, **kwargs: Any) -> Any:
         response = self._request_raw(method, path, **kwargs)
-        self._raise_for_status(response)
+        self._raise_for_status(response, request_context=kwargs.get("json"))
         return response.json()
 
     def _request_raw(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
@@ -264,13 +273,22 @@ class ForgejoClient:
         with httpx.Client(timeout=30.0, headers=headers) as client:
             return client.request(method, url, **kwargs)
 
-    def _raise_for_status(self, response: httpx.Response) -> None:
+    def _raise_for_status(self, response: httpx.Response, request_context: Any = None) -> None:
         if response.is_success:
             return
         body = response.text.strip()
         if len(body) > 200:
             body = f"{body[:200]}..."
-        raise ForgejoError(f"Forgejo API {response.status_code}: {body}")
+        msg = f"Forgejo API {response.status_code}: {body}"
+        if request_context is not None:
+            import json
+
+            try:
+                ctx = json.dumps(request_context, default=str)
+            except (TypeError, ValueError):
+                ctx = str(request_context)
+            msg += f" | request payload: {ctx}"
+        raise ForgejoError(msg)
 
     def _issue_comments_with_fallback(self, owner: str, repo: str, index: int) -> list[dict[str, Any]]:
         primary = f"/api/v1/repos/{owner}/{repo}/issues/{index}/comments"

@@ -96,6 +96,18 @@ def delete_branch_args(name: str) -> list[str]:
     return ["branch", "-D", name]
 
 
+def ls_remote_ref_args(remote: str, branch: str) -> list[str]:
+    return ["ls-remote", remote, f"refs/heads/{branch}"]
+
+
+def merge_base_args(ref1: str, ref2: str) -> list[str]:
+    return ["merge-base", ref1, ref2]
+
+
+def rev_parse_args(ref: str) -> list[str]:
+    return ["rev-parse", ref]
+
+
 def working_branch_for_review(branch: str) -> str | None:
     prefix = "joan-review/"
     if not branch.startswith(prefix):

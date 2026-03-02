@@ -48,7 +48,7 @@ def test_pr_create(monkeypatch, sample_config) -> None:
 
     result = runner.invoke(pr_mod.app, ["create"])
     assert result.exit_code == 0
-    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "joan-review", "feat"] not in calls  # base push removed; set by branch create
     assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
     assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
     assert "PR #4" in result.output
@@ -79,7 +79,7 @@ def test_pr_open_alias(monkeypatch, sample_config) -> None:
     result = runner.invoke(pr_mod.app, ["open"])
 
     assert result.exit_code == 0
-    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "joan-review", "feat"] not in calls  # base push removed; set by branch create
     assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
     assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
     assert "PR #6" in result.output
@@ -120,7 +120,7 @@ def test_pr_create_requests_human_review_by_default(monkeypatch, sample_config) 
     result = runner.invoke(pr_mod.app, ["create"])
 
     assert result.exit_code == 0
-    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "joan-review", "feat"] not in calls  # base push removed; set by branch create
     assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
     assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
     assert captured["reviewer_call"] == {
@@ -156,7 +156,7 @@ def test_pr_create_accepts_suffixed_review_branch(monkeypatch, sample_config) ->
     result = runner.invoke(pr_mod.app, ["create"])
 
     assert result.exit_code == 0, result.output
-    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "joan-review", "feat"] not in calls  # base push removed; set by branch create
     assert ["push", "-u", "joan-review", "joan-review/feat--plan-cache"] in calls
     assert captured["payload"] == {
         "title": "joan-review/feat--plan-cache",
@@ -194,7 +194,7 @@ def test_pr_create_can_skip_human_review_request(monkeypatch, sample_config) -> 
     result = runner.invoke(pr_mod.app, ["create", "--no-request-human-review"])
 
     assert result.exit_code == 0
-    assert ["push", "joan-review", "feat"] in calls
+    assert ["push", "joan-review", "feat"] not in calls  # base push removed; set by branch create
     assert ["push", "-u", "joan-review", "joan-review/feat"] in calls
     assert captured["payload"] == {"title": "joan-review/feat", "head": "joan-review/feat", "base": "feat"}
     assert "PR #4" in result.output
