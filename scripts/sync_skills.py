@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import json
 import shutil
 import sys
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +19,8 @@ TARGET_ROOTS = (
     REPO_ROOT / ".agents" / "skills",
     REPO_ROOT / "src" / "joan" / "data" / "codex-skills",
 )
+PYPROJECT = REPO_ROOT / "pyproject.toml"
+PLUGIN_JSON = REPO_ROOT / ".claude-plugin" / "plugin.json"
 
 
 def _skill_dirs(base: Path) -> dict[str, Path]:
@@ -44,6 +52,26 @@ def _compare_dirs(source: Path, target: Path) -> bool:
     )
 
 
+def check_version_parity() -> list[str]:
+    pyproject_version = tomllib.loads(PYPROJECT.read_text())["project"]["version"]
+    plugin_data = json.loads(PLUGIN_JSON.read_text())
+    plugin_version = plugin_data.get("version", "")
+    if pyproject_version != plugin_version:
+        return [
+            f"Version mismatch: pyproject.toml={pyproject_version!r}, "
+            f".claude-plugin/plugin.json={plugin_version!r}"
+        ]
+    return []
+
+
+def sync_version() -> None:
+    pyproject_version = tomllib.loads(PYPROJECT.read_text())["project"]["version"]
+    plugin_data = json.loads(PLUGIN_JSON.read_text())
+    if plugin_data.get("version") != pyproject_version:
+        plugin_data["version"] = pyproject_version
+        PLUGIN_JSON.write_text(json.dumps(plugin_data, indent=2) + "\n")
+
+
 def sync_skills(
     source_root: Path = SOURCE_ROOT,
     target_roots: tuple[Path, ...] = TARGET_ROOTS,
@@ -51,6 +79,12 @@ def sync_skills(
     check: bool = False,
 ) -> list[str]:
     issues: list[str] = []
+
+    if check:
+        issues.extend(check_version_parity())
+    else:
+        sync_version()
+
     source_skills = _skill_dirs(source_root)
 
     if not source_skills:
@@ -109,7 +143,7 @@ def main() -> int:
         return 1
 
     if args.check:
-        print("Skill mirrors are in sync.")
+        print("Skill mirrors are in sync. Versions match.")
     else:
         print("Synced skills into repo-local and packaged Codex mirrors.")
     return 0
