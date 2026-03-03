@@ -195,6 +195,10 @@ It also grants the configured human reviewer admin access to the review repo.
 ## Daily workflow
 
 ```bash
+# If this branch predates Joan tracking or was created outside Joan,
+# register its parent branch once before the first review:
+uv run joan branch adopt --base-ref origin/main
+
 # Create a review branch and open a PR
 uv run joan branch create
 uv run joan pr create --title "Add feature X"
@@ -216,6 +220,7 @@ uv run joan pr push
 ```
 
 `uv run joan pr create` requests review from the configured human user by default. Pass `--no-request-human-review` if you need to skip that.
+Use `uv run joan branch adopt --base-ref <ref>` before the first Joan review on an existing branch when the correct parent branch is not obvious or is not `main`.
 
 ## Planning
 
@@ -345,6 +350,7 @@ command = ["codex"]
 | `joan init` | One-time setup: create token, write config |
 | `joan ssh setup [--key-path PATH] [--title TEXT]` | Create/reuse an SSH keypair and upload key to Forgejo |
 | `joan remote add` | Create Forgejo repo, add `joan-review` remote |
+| `joan branch adopt --base-ref REF [--branch NAME]` | Record where an existing working branch started so the first review PR uses the right base |
 | `joan branch create [name]` | Create and push a review branch |
 | `joan pr create` | Open a PR on Forgejo |
 | `joan pr sync` | JSON: approval status + unresolved comment count |

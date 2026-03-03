@@ -47,6 +47,7 @@ Never commit `.joan/` because these files contain tokens and secrets.
 | `joan init` | One-time setup: create token and write config |
 | `joan ssh setup [--key-path PATH] [--title TEXT]` | Create or reuse an SSH keypair and upload it to Forgejo |
 | `joan remote add` | Create the Forgejo repo and add `joan-review` |
+| `joan branch adopt --base-ref REF [--branch NAME]` | Record where an existing working branch started so the first review PR uses the right base |
 | `joan branch create [name]` | Create and push a review branch |
 | `joan pr create` | Open a PR on Forgejo |
 | `joan pr sync` | Output approval status and unresolved comment count as JSON |

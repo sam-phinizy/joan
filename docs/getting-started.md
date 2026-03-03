@@ -104,3 +104,14 @@ uv run joan remote add
 ```
 
 This creates a private Forgejo repo and adds `joan-review` as a git remote.
+
+### 4. Adopt an existing branch when needed
+
+If you already have a working branch and want Joan's first review PR to start
+from the correct parent branch, register it once before the first review:
+
+```bash
+uv run joan branch adopt --base-ref origin/main
+```
+
+For stacked branches, use the real parent branch instead of `origin/main`.

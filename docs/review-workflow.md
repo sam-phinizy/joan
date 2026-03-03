@@ -3,6 +3,10 @@
 ## Daily flow
 
 ```bash
+# If this branch predates Joan tracking or was created outside Joan,
+# register its parent branch once before the first review:
+uv run joan branch adopt --base-ref origin/main
+
 # Create a review branch and open a PR
 uv run joan branch create
 uv run joan pr create --title "Add feature X"
@@ -24,6 +28,7 @@ uv run joan pr push
 ```
 
 `joan pr create` requests review from the configured human user by default. Pass `--no-request-human-review` if you need to skip that.
+Use `joan branch adopt` only on the first Joan review for an existing branch, or when the branch is stacked on top of another non-`main` branch and you need to choose the parent explicitly.
 
 ## Planning
 
