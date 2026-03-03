@@ -42,6 +42,16 @@ uv run joan phil serve
 uv run joan phil work
 ```
 
+## On-demand review (no server required)
+
+You can trigger a Phil review directly from Claude Code or Codex without running the webhook server:
+
+```
+/joan:phil-review
+```
+
+This skill reads the diff from your current branch's open PR, reviews it as Phil, and posts inline comments and a final verdict to Forgejo using the CLI commands below. No webhook or worker process needed.
+
 ## How Phil posts review feedback
 
 Phil posts through Joan's CLI.
