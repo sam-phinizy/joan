@@ -130,7 +130,7 @@ Joan routes reviews through a local [Forgejo](https://forgejo.org) instance runn
 Install the compose file to a directory of your choice (default: `~/joan-forge`):
 
 ```bash
-uv run joan forge install ~/joan-forge
+uv run joan services install forgejo ~/joan-forge
 ```
 
 Then start Forgejo:
@@ -358,5 +358,5 @@ command = ["codex"]
 | `joan phil up` | Start the Phil webhook server and one local queue worker |
 | `joan phil serve` | Start the Phil webhook server only |
 | `joan phil work` | Start the Phil worker only |
+| `joan services install <service> [path]` | Copy a bundled docker-compose stack (for example `forgejo`) to a directory |
 | `joan skills install --agent <claude\|codex>` | Install the Claude plugin or Codex skills |
-| `joan forge install [path]` | Copy Forgejo docker-compose.yml to a directory |

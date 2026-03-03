@@ -20,6 +20,7 @@ def test_root_cli_has_expected_commands() -> None:
     assert "branch" in result.output
     assert "plan" in result.output
     assert "pr" in result.output
+    assert "services" in result.output
     assert "ssh" in result.output
     assert "worktree" in result.output
 
