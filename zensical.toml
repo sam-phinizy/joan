@@ -1,6 +1,13 @@
 [project]
 site_name = "Joan"
 site_url = "https://sam-phinizy.github.io/joan/"
+nav = [
+  {"Home" = "index.md"},
+  {"Getting Started" = "getting-started.md"},
+  {"Review Workflow" = "review-workflow.md"},
+  {"Phil" = "phil.md"},
+  {"Reference" = "reference.md"},
+]
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme)"
