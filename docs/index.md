@@ -1,18 +1,16 @@
-# Joan
+# Joan Docs
 
-Joan is a local code review gate for AI agents. Agents push work to a local [Forgejo](https://forgejo.org) instance, a human reviews it there, and only approved work gets pushed to the real upstream.
+Joan now uses one workflow:
 
-## How it works
+- work on a normal task branch
+- review incrementally into `joan-stage/<task-branch>` on the Forgejo review remote
+- publish upstream later with `uv run joan ship`
 
-```text
-agent commits -> joan pr create -> human reviews on Forgejo -> joan pr finish -> local base branch -> joan pr push -> origin
-```
+Start here:
 
-Joan enforces the review gate at `joan pr finish`: it will not finish a PR that is unapproved or still has unresolved comments.
+1. [Getting Started](./getting-started.md)
+2. [Review Workflow](./review-workflow.md)
+3. [Reference](./reference.md)
 
-## Core guides
-
-- [Getting started](getting-started.md)
-- [Review workflow](review-workflow.md)
-- [Phil local AI reviewer](phil.md)
-- [Configuration and command reference](reference.md)
+Breaking change: the old `joan branch ...`, `joan plan ...`, and `joan pr push`
+flows have been removed.

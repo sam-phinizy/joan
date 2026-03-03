@@ -4,147 +4,64 @@ description: >-
   Run the Joan code review cycle through the local Forgejo instance. This skill
   should be used when the user wants to submit code for review, open a pull
   request on Forgejo, check PR status or review feedback, address or resolve
-  reviewer comments, create a review branch, finish an approved PR locally, or
-  push finished changes upstream. Covers the full lifecycle: branch creation,
-  PR creation, comment resolution, gated local finish, and separate upstream
-  push.
+  reviewer comments, finish an approved PR into the task stage branch, or ship
+  reviewed work upstream.
 ---
 
 # Joan Review Workflow
 
-## Overview
+Joan reviews a normal working branch against a long-lived stage branch on the
+Forgejo review remote.
 
-Joan gates all code through local Forgejo review before it reaches upstream (GitHub, GitLab, etc.). The cycle is:
+## Model
 
-1. Create a review branch
-2. Open a PR on Forgejo
-3. Human reviews and leaves comments
-4. Agent addresses feedback and resolves comments
-5. Once approved by the human reviewer, immediately finish by merging the PR on Forgejo and cleaning up the review branch with `uv run joan pr finish`
-6. Only push to GitHub later, as a separate explicit step, with `uv run joan pr push`
+- Working branch: `feature/cache`
+- Stage branch: `joan-stage/feature/cache`
+- Review PR: `feature/cache -> joan-stage/feature/cache`
+- Final publish step: `uv run joan ship`
 
-All Joan data commands (`pr sync`, `pr comments`) output structured JSON to stdout.
+## Workflow
 
-If the user is still in the planning stage and wants feedback on a plan before code exists, prefer `$joan-plan` when that skill is available. If it is not available in the current session, use `uv run joan plan create ...` directly. This skill is for the code review cycle after implementation work has started.
-
-## Determine Current State
-
-Before doing anything, figure out where you are in the review cycle:
-
-1. **Check config**: Verify `.joan/config.toml` exists. If not, tell the user to run setup first (invoke `/joan:joan-setup`).
-
-2. **Check current branch**:
-   ```
+1. Make sure `.joan/config.toml` exists. If not, invoke `/joan:joan-setup`.
+2. Confirm the current branch is a normal task branch:
+   ```bash
    git rev-parse --abbrev-ref HEAD
    ```
-   If on `main`, stop and create a real working branch first. Joan review branches should be created from an existing non-`main` working branch.
-
-   If the current working branch predates Joan tracking or was created outside
-   Joan and the user wants to choose the parent branch explicitly, invoke
-   `/joan:joan-adopt-branch` before creating the first review PR.
-
-3. **Check for existing PR**:
-   ```
+   If the user is on `main`, start or switch to a task with `/joan:joan-task`.
+3. Check whether there is already an open PR:
+   ```bash
    uv run joan pr sync
    ```
-   - If this succeeds with JSON output → there's an active PR. Go to Sub-workflow B.
-   - If this fails with "No open PR found" → no PR exists yet. Go to Sub-workflow A.
-
-**Routing summary:**
-| State | Action |
-|-------|--------|
-| On `main`, no PR | Create a working branch first, then continue with Sub-workflow A |
-| On branch, no PR | Start Sub-workflow A at step 1: create a Joan review branch, then create the PR |
-| PR exists | Invoke `/joan:joan-resolve-pr` — it handles all review states |
-
----
-
-## Sub-workflow A: Submit New Work
-
-Use this when starting fresh work that needs review.
-
-### 1. Create a review branch
-
-Always do this before `uv run joan pr create` unless you intentionally plan to pass `--base` from a non-review branch. The normal Joan flow is to open PRs from a `joan-review/...` branch.
-
-If this is the first Joan review on an existing branch and the branch base is
-ambiguous, stop and run `/joan:joan-adopt-branch` first so the user can choose
-the correct parent branch.
-
-```
-uv run joan branch create [name]
-```
-
-If `[name]` is omitted, Joan auto-generates `joan-review/<current-branch>--rN` (where N increments to avoid collisions) and checks it out.
-Joan also pushes the untouched current branch to Forgejo first so it can be used as the PR base.
-
-Output:
-```
-Created review branch: joan-review/feature/add-in-cacheing (base: feature/add-in-cacheing)
-```
-
-### 2. Stage and commit changes
-
-Stage and commit your work on this branch as usual with `git add` and `git commit`. If the work is already committed, skip this step.
-
-### 3. Create a PR
-
-```
-uv run joan pr create --title "Short description of changes" --body "Detailed explanation"
-```
-
-- `--title` defaults to the branch name if omitted
-- `--body` is optional
-- `--base` defaults to the base branch implied by `joan-review/<base-branch>`
-- By default, Joan requests review from the configured human user in `.joan/config.toml`
-- Pass `--no-request-human-review` to skip the automatic reviewer request
-- If you're not on a `joan-review/...` branch, pass `--base` explicitly
-
-Output:
-```
-PR #4: http://localhost:3000/owner/repo/pulls/4
-```
-
-Tell the user the Forgejo URL so they can review the PR in the web UI.
-
----
-
-## Sub-workflow B: Check & Address Feedback
-
-Use this when a PR exists. Invoke the `joan-resolve-pr` skill — it handles the
-full state matrix: line comments, reviewer-requested changes with a body,
-PR approval and finish, and no-actionable-feedback states.
-
-```
-/joan:joan-resolve-pr
-```
-
-Do not replicate the resolution logic here. `joan-resolve-pr` owns it.
+   - If there is no PR, open one:
+     ```bash
+     uv run joan pr create --title "Short description of changes"
+     ```
+   - If a PR exists, invoke `/joan:joan-resolve-pr`.
+4. Once the PR is approved and comments are resolved:
+   ```bash
+   uv run joan pr finish
+   ```
+   This merges the PR into `joan-stage/<working-branch>`.
+5. When the staged work is ready for the final GitHub PR:
+   ```bash
+   uv run joan ship
+   ```
 
 ## Rules
 
-1. **Never push to `origin` directly.** When the user wants to publish upstream, use `uv run joan pr push` instead.
-2. **Always use `uv run joan`**, not bare `joan`. Joan is managed by `uv` and may not be on PATH.
-3. **Resolve comments one at a time** as you address each one, not in bulk at the end.
-4. **Discussion comments go to the user.** If a comment is a question or discussion point (not an actionable change request), surface it to the user and let them decide how to handle it. Do not auto-resolve.
-5. **Check state before acting.** Always run `uv run joan pr sync` to understand where you are before starting work.
-6. **Upstream push is separate.** Do not push to GitHub as part of finishing a PR. Only run `uv run joan pr push` later if the user explicitly wants the finished branch published upstream.
-
----
+1. Always use `uv run joan`.
+2. Do not push to the upstream remote directly; use `uv run joan ship`.
+3. Resolve comments one at a time and re-push with `uv run joan task push`.
+4. `joan-resolve-pr` owns the detailed “what to do with this PR state?” logic.
 
 ## Quick Reference
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `uv run joan branch create [name]` | Create review branch | `Created review branch: {review_branch} (base: {working_branch})` |
-| `uv run joan pr create --title "..." --body "..."` | Open PR on Forgejo and request the configured human reviewer by default | `PR #N: {url}` |
-| `uv run joan pr sync` | Check approval & comment status | JSON: `{approved, unresolved_comments, latest_review_state}` |
-| `uv run joan pr comments` | List unresolved PR-level and inline review comments for the current PR | JSON array of comment objects |
-| `uv run joan pr reviews` | List review submissions with body and state | JSON array: `[{id, state, body, author, submitted_at}]` |
-| `uv run joan pr comments --pr N` | List unresolved comments for a specific PR | JSON array of comment objects |
-| `uv run joan pr comments --branch <name>` | List unresolved comments for the open PR on a specific branch | JSON array of comment objects |
-| `uv run joan pr comments --all` | List all comments (incl. resolved) | JSON array of comment objects |
-| `uv run joan pr comment resolve <id>` | Mark comment as resolved | `Resolved comment <id>` |
-| `uv run joan pr finish` | Merge PR on Forgejo, pull result, clean up review branch | `Merged PR #N and cleaned up {review_branch}` |
-| `uv run joan pr push` | Push the current finished local branch upstream | `Pushed {branch} to origin/{branch}` |
-| `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |
+| `uv run joan pr create --title "..." --body "..."` | Open a Forgejo PR from the task branch to its stage branch | `PR #N: {url}` |
+| `uv run joan pr sync` | Check approval and comment state | JSON: `{approved, unresolved_comments, latest_review_state}` |
+| `uv run joan pr comments` | List unresolved PR comments | JSON array of comment objects |
+| `uv run joan pr reviews` | List review submissions | JSON array: `[{id, state, body, author, submitted_at}]` |
+| `uv run joan task push` | Push the task branch for another review round | `Pushed task branch: {branch}` |
+| `uv run joan pr finish` | Merge the approved PR into the stage branch | `Merged PR #N into joan-stage/{branch}` |
+| `uv run joan ship` | Create or refresh the upstream publish branch | `Prepared publish branch ...` |

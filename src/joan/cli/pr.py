@@ -11,7 +11,6 @@ from joan.cli._common import (
     forgejo_client_for_agent_or_exit,
     load_config_or_exit,
 )
-from joan.core.branch_state import save_review_checkpoint
 from joan.core.forgejo import (
     build_create_pr_payload,
     compute_sync_status,
@@ -22,31 +21,37 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import (
-    checkout_branch_args,
-    delete_branch_args,
-    is_plan_review_branch,
-    merge_ff_only_args,
-    push_branch_args,
-    rev_parse_args,
-    working_branch_for_review,
-)
+from joan.core.git import is_stage_branch, ls_remote_ref_args, push_branch_args, stage_branch_name
 from joan.shell.git_runner import run_git
 
-app = typer.Typer(help="Open Forgejo PRs, inspect review state, finish approved PRs locally, and push upstream separately.")
+app = typer.Typer(help="Open Forgejo PRs, inspect review state, and merge approved work into Joan stage branches.")
 comment_app = typer.Typer(help="Read or resolve PR comments.")
 review_app = typer.Typer(help="Post review verdicts on PRs.")
 app.add_typer(comment_app, name="comment")
 app.add_typer(review_app, name="review")
 
 
+def _ensure_task_branch(branch: str) -> None:
+    if branch in {"main", "master"} or branch.startswith("joan-review/") or is_stage_branch(branch):
+        typer.echo("Run this command from a normal Joan task branch.", err=True)
+        raise typer.Exit(code=2)
+
+
+def _ensure_stage_exists(remote: str, branch: str) -> str:
+    stage_branch = stage_branch_name(branch)
+    if not run_git(ls_remote_ref_args(remote, stage_branch)):
+        typer.echo(
+            "No Joan stage branch exists for this task. Use `uv run joan task start ...` "
+            "or `uv run joan task track --from <ref>` first.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    return stage_branch
+
+
 def _create_pr(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
-    base: str | None = typer.Option(
-        default=None,
-        help="Base branch. Defaults to the branch implied by the current `joan-review/*` branch.",
-    ),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
@@ -57,18 +62,9 @@ def _create_pr(
     client = forgejo_client(config)
 
     branch = current_branch()
-    resolved_base = base or working_branch_for_review(branch)
-    if not resolved_base:
-        typer.echo(
-            "Current branch is not a review branch. Use `joan branch create` first or pass `--base`.",
-            err=True,
-        )
-        raise typer.Exit(code=2)
+    _ensure_task_branch(branch)
+    resolved_base = _ensure_stage_exists(config.remotes.review, branch)
 
-    # Only push the review (head) branch — the base branch was already
-    # pushed at the correct SHA by `joan branch create`.  Re-pushing it
-    # here would overwrite the remote base with the local ref (which
-    # points to HEAD), collapsing the diff back to zero.
     run_git(push_branch_args(config.remotes.review, branch, set_upstream=True))
 
     payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=body)
@@ -80,14 +76,10 @@ def _create_pr(
     typer.echo(f"PR #{pr.number}: {pr.url}")
 
 
-@app.command("create", help="Create a PR from the current `joan-review/*` branch to its working branch on the review remote.")
+@app.command("create", help="Create a PR from the current task branch to its Joan stage branch.")
 def pr_create(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
-    base: str | None = typer.Option(
-        default=None,
-        help="Base branch. Defaults to the branch implied by the current `joan-review/*` branch.",
-    ),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
@@ -97,7 +89,6 @@ def pr_create(
     _create_pr(
         title=title,
         body=body,
-        base=base,
         request_human_review=request_human_review,
     )
 
@@ -106,10 +97,6 @@ def pr_create(
 def pr_open(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
-    base: str | None = typer.Option(
-        default=None,
-        help="Base branch. Defaults to the branch implied by the current `joan-review/*` branch.",
-    ),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
@@ -119,7 +106,6 @@ def pr_open(
     _create_pr(
         title=title,
         body=body,
-        base=base,
         request_human_review=request_human_review,
     )
 
@@ -164,7 +150,7 @@ def pr_comments(
     branch: str | None = typer.Option(
         None,
         "--branch",
-        help="Branch whose open PR should be inspected (use your latest review branch when not checked out there)",
+        help="Branch whose open PR should be inspected instead of the current branch",
     ),
 ) -> None:
     if pr_number is not None and branch is not None:
@@ -180,7 +166,7 @@ def pr_comments(
     typer.echo(format_comments_json(comments, include_resolved=all_comments))
 
 
-@app.command("reviews", help="List review submissions (with body text) for the open PR on the current branch. Use `pr sync` to check review state for a different PR.")
+@app.command("reviews", help="List review submissions (with body text) for the open PR on the current branch.")
 def pr_reviews() -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
@@ -241,56 +227,36 @@ def pr_comment_add(
 
 @app.command(
     "finish",
-    help="Merge the approved PR on Forgejo, pull the result locally, and clean up review branches.",
+    help="Merge the approved PR on Forgejo into the current task branch's stage branch.",
 )
 def pr_finish() -> None:
     config = load_config_or_exit()
     client = forgejo_client(config)
-    pr = current_pr_or_exit(config)
+    branch = current_branch()
+    _ensure_task_branch(branch)
+    expected_base = stage_branch_name(branch)
+    pr = current_pr_or_exit(config, branch=branch)
+    if pr.base_ref != expected_base:
+        typer.echo(
+            f"Open PR for '{branch}' targets '{pr.base_ref}', not the expected stage branch '{expected_base}'.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
     reviews = parse_reviews(client.get_reviews(config.forgejo.owner, config.forgejo.repo, pr.number))
-    sync = compute_sync_status(reviews, [])
+    comments = parse_comments(client.get_comments(config.forgejo.owner, config.forgejo.repo, pr.number))
+    comments = exclude_comments_by_author(comments, config.forgejo.owner)
+    sync = compute_sync_status(reviews, comments)
     if not sync.approved:
         typer.echo("PR is not approved on Forgejo.", err=True)
         raise typer.Exit(code=1)
+    if sync.unresolved_comments:
+        typer.echo("PR still has unresolved review comments on Forgejo.", err=True)
+        raise typer.Exit(code=1)
 
-    review_branch = current_branch()
     client.merge_pr(config.forgejo.owner, config.forgejo.repo, pr.number)
-
-    # Pull merged result locally
     run_git(["fetch", config.remotes.review])
-    run_git(checkout_branch_args(pr.base_ref))
-    run_git(["pull", config.remotes.review, pr.base_ref])
-
-    # Clean up review branch
-    run_git(delete_branch_args(review_branch))
-    try:
-        client.delete_branch(config.forgejo.owner, config.forgejo.repo, review_branch)
-    except Exception:  # noqa: BLE001
-        pass  # branch may already be deleted by Forgejo merge
-
-    # Only code-review PRs advance the review checkpoint. Plan PRs should not
-    # hide older unreviewed code on the same working branch.
-    new_head = run_git(rev_parse_args("HEAD"))
-    if not is_plan_review_branch(review_branch):
-        save_review_checkpoint(pr.base_ref, new_head)
-
-    typer.echo(f"Merged PR #{pr.number} and cleaned up {review_branch}")
-
-
-@app.command("push", help="Push the current finished local branch to the real upstream remote.")
-def pr_push() -> None:
-    config = load_config_or_exit()
-    branch = current_branch()
-    if working_branch_for_review(branch):
-        typer.echo(
-            "Current branch is a review branch. Run `uv run joan pr finish` first to merge it back into the base branch locally.",
-            err=True,
-        )
-        raise typer.Exit(code=2)
-
-    run_git(push_branch_args(config.remotes.upstream, branch, set_upstream=False))
-    typer.echo(f"Pushed {branch} to {config.remotes.upstream}/{branch}")
+    typer.echo(f"Merged PR #{pr.number} into {expected_base}")
 
 
 @app.command("update", help="Update the description of the current branch's open PR.")
@@ -379,21 +345,17 @@ def pr_review_submit(
     owner: str = typer.Option(..., "--owner", help="Forgejo repo owner for the target PR."),
     repo: str = typer.Option(..., "--repo", help="Forgejo repo name for the target PR."),
     pr: int = typer.Option(..., "--pr", help="Pull request number to review."),
-    verdict: str = typer.Option(..., "--verdict", help="Review verdict: `approve`, `request_changes`, or `comment`."),
+    verdict: str = typer.Option(..., "--verdict", help="One of: approve, request_changes, comment."),
     body: str = typer.Option("", "--body", help="Optional review summary/body."),
 ) -> None:
     config = load_config_or_exit()
     client = forgejo_client_for_agent_or_exit(config, agent)
-    try:
-        client.create_review(
-            owner=owner,
-            repo=repo,
-            index=pr,
-            body=body,
-            verdict=verdict,
-            comments=[],
-        )
-    except Exception as exc:  # noqa: BLE001
-        typer.echo(f"Failed to post review: {exc}", err=True)
-        raise typer.Exit(code=1)
+    client.create_review(
+        owner,
+        repo,
+        pr,
+        body=body,
+        verdict=verdict,
+        comments=[],
+    )
     typer.echo(f"Posted review ({verdict}) on PR #{pr}")

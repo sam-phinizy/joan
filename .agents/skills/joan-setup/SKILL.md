@@ -100,5 +100,5 @@ If any check fails, re-run the relevant step above.
 
 ## Next Steps
 
-Setup is done. For the daily review workflow — creating PRs, checking feedback, and pushing approved work upstream — invoke `/joan:joan-review`.
-If you need to put an existing branch under Joan and choose its parent branch explicitly first, invoke `/joan:joan-adopt-branch`.
+Setup is done. For new work, invoke `/joan:joan-task`.
+Once work exists on a task branch, invoke `/joan:joan-review` to open and manage the Forgejo PR.

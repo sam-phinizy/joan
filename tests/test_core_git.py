@@ -5,47 +5,50 @@ from datetime import UTC, datetime
 import joan.core.git as git_mod
 
 
-def test_git_arg_builders() -> None:
+def test_basic_git_arg_helpers() -> None:
     assert git_mod.create_branch_args("feat") == ["checkout", "-b", "feat"]
     assert git_mod.create_branch_args("feat", "main") == ["checkout", "-b", "feat", "main"]
     assert git_mod.checkout_branch_args("feat") == ["checkout", "feat"]
     assert git_mod.merge_ff_only_args("topic") == ["merge", "--ff-only", "topic"]
+    assert git_mod.reset_branch_args("publish/feat", "joan-review/joan-stage/feat") == [
+        "branch",
+        "-f",
+        "publish/feat",
+        "joan-review/joan-stage/feat",
+    ]
     assert git_mod.push_branch_args("origin", "feat", set_upstream=True) == ["push", "-u", "origin", "feat"]
     assert git_mod.push_branch_args("origin", "feat", set_upstream=False) == ["push", "origin", "feat"]
-    assert git_mod.push_refspec_args("joan-review", "refs/heads/feat", "refs/heads/joan/feat") == [
+    assert git_mod.push_refspec_args("origin", "refs/heads/feat", "refs/heads/joan/feat") == [
         "push",
-        "joan-review",
+        "origin",
         "refs/heads/feat:refs/heads/joan/feat",
     ]
     assert git_mod.current_branch_args() == ["rev-parse", "--abbrev-ref", "HEAD"]
     assert git_mod.worktree_add_args("/tmp/wt", branch="feat") == ["worktree", "add", "-b", "feat", "/tmp/wt"]
-    assert git_mod.worktree_add_args("/tmp/wt") == ["worktree", "add", "/tmp/wt"]
     assert git_mod.worktree_remove_args("/tmp/wt") == ["worktree", "remove", "/tmp/wt"]
-    assert git_mod.remote_add_args("r", "u") == ["remote", "add", "r", "u"]
-    assert git_mod.remote_set_url_args("r", "u") == ["remote", "set-url", "r", "u"]
+    assert git_mod.remote_add_args("review", "http://x") == ["remote", "add", "review", "http://x"]
+    assert git_mod.remote_set_url_args("review", "http://x") == ["remote", "set-url", "review", "http://x"]
     assert git_mod.list_remotes_args() == ["remote"]
-    assert git_mod.review_branch_name("feat", "plan-cache") == "joan-review/feat--plan-cache"
     assert git_mod.delete_branch_args("feat") == ["branch", "-D", "feat"]
-    assert git_mod.working_branch_for_review("joan-review/feat") == "feat"
-    assert git_mod.working_branch_for_review("joan-review/feat--plan-cache") == "feat"
-    assert git_mod.working_branch_for_review("feat") is None
+    assert git_mod.ls_remote_ref_args("joan-review", "feat") == ["ls-remote", "joan-review", "refs/heads/feat"]
+    assert git_mod.merge_base_args("main", "HEAD") == ["merge-base", "main", "HEAD"]
+    assert git_mod.rev_parse_args("HEAD") == ["rev-parse", "HEAD"]
 
 
-def test_review_branch_name_auto_suffix(monkeypatch) -> None:
-    monkeypatch.setattr(git_mod, "_next_review_number", lambda _base: 3)
-    assert git_mod.review_branch_name("feat") == "joan-review/feat--r3"
-
-
-def test_working_branch_for_review_with_rN_suffix() -> None:
-    assert git_mod.working_branch_for_review("joan-review/feat--r1") == "feat"
-    assert git_mod.working_branch_for_review("joan-review/feat--r42") == "feat"
+def test_stage_branch_helpers() -> None:
+    assert git_mod.stage_branch_name("feature/foo") == "joan-stage/feature/foo"
+    assert git_mod.working_branch_for_stage("joan-stage/feature/foo") == "feature/foo"
+    assert git_mod.working_branch_for_stage("feature/foo") is None
+    assert git_mod.is_stage_branch("joan-stage/feature/foo") is True
+    assert git_mod.is_stage_branch("feature/foo") is False
+    assert git_mod.default_publish_branch_name("feature/foo") == "publish/feature-foo"
 
 
 def test_infer_branch_name_with_hint(monkeypatch) -> None:
-    class FakeDatetime:
+    class FakeDatetime(datetime):
         @classmethod
-        def now(cls, _tz):
-            return datetime(2026, 2, 27, 1, 2, 3, tzinfo=UTC)
+        def now(cls, tz=None):
+            return cls(2026, 2, 27, 1, 2, 3, tzinfo=UTC)
 
     monkeypatch.setattr(git_mod, "datetime", FakeDatetime)
 
@@ -53,10 +56,10 @@ def test_infer_branch_name_with_hint(monkeypatch) -> None:
 
 
 def test_infer_branch_name_without_hint(monkeypatch) -> None:
-    class FakeDatetime:
+    class FakeDatetime(datetime):
         @classmethod
-        def now(cls, _tz):
-            return datetime(2026, 2, 27, 1, 2, 3, tzinfo=UTC)
+        def now(cls, tz=None):
+            return cls(2026, 2, 27, 1, 2, 3, tzinfo=UTC)
 
     monkeypatch.setattr(git_mod, "datetime", FakeDatetime)
 

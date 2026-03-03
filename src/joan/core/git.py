@@ -18,6 +18,10 @@ def merge_ff_only_args(branch: str) -> list[str]:
     return ["merge", "--ff-only", branch]
 
 
+def reset_branch_args(name: str, start_point: str) -> list[str]:
+    return ["branch", "-f", name, start_point]
+
+
 def push_branch_args(remote: str, branch: str, set_upstream: bool = True) -> list[str]:
     args = ["push"]
     if set_upstream:
@@ -67,29 +71,25 @@ def infer_branch_name(hint: str | None = None) -> str:
     return f"codex/work-{stamp}"
 
 
-def review_branch_name(base_branch: str, topic: str | None = None) -> str:
-    if topic:
-        return f"joan-review/{base_branch}--{topic}"
-    return f"joan-review/{base_branch}--r{_next_review_number(base_branch)}"
+def stage_branch_name(working_branch: str) -> str:
+    return f"joan-stage/{working_branch}"
 
 
-def _next_review_number(base_branch: str) -> int:
-    import re
-    import subprocess
+def working_branch_for_stage(branch: str) -> str | None:
+    prefix = "joan-stage/"
+    if not branch.startswith(prefix):
+        return None
+    working_branch = branch[len(prefix) :]
+    return working_branch or None
 
-    result = subprocess.run(
-        ["git", "branch", "--list", f"joan-review/{base_branch}--r*"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    numbers = []
-    for line in result.stdout.splitlines():
-        branch = line.strip().lstrip("* ")
-        m = re.search(r"--r(\d+)$", branch)
-        if m:
-            numbers.append(int(m.group(1)))
-    return max(numbers, default=0) + 1
+
+def is_stage_branch(branch: str) -> bool:
+    return working_branch_for_stage(branch) is not None
+
+
+def default_publish_branch_name(working_branch: str) -> str:
+    flattened = working_branch.replace("/", "-")
+    return f"publish/{flattened}"
 
 
 def delete_branch_args(name: str) -> list[str]:
@@ -106,24 +106,3 @@ def merge_base_args(ref1: str, ref2: str) -> list[str]:
 
 def rev_parse_args(ref: str) -> list[str]:
     return ["rev-parse", ref]
-
-
-def working_branch_for_review(branch: str) -> str | None:
-    prefix = "joan-review/"
-    if not branch.startswith(prefix):
-        return None
-    base_branch = branch[len(prefix) :].split("--", 1)[0]
-    return base_branch or None
-
-
-def review_branch_topic(branch: str) -> str | None:
-    prefix = "joan-review/"
-    if not branch.startswith(prefix):
-        return None
-    _, _, topic = branch[len(prefix) :].partition("--")
-    return topic or None
-
-
-def is_plan_review_branch(branch: str) -> bool:
-    topic = review_branch_topic(branch)
-    return bool(topic and topic.startswith("plan-"))

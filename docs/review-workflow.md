@@ -1,62 +1,77 @@
 # Review Workflow
 
-## Daily flow
+Joan reviews a normal task branch into a long-lived stage branch on the Forgejo
+review remote.
+
+## Shape of the flow
+
+```mermaid
+gitGraph
+    commit id: "main"
+    branch stage
+    checkout stage
+    commit id: "stage start"
+    checkout main
+    branch task
+    checkout task
+    commit id: "slice 1"
+    checkout stage
+    merge task tag: "PR 1"
+    checkout task
+    commit id: "slice 2"
+    checkout stage
+    merge task tag: "PR 2"
+    checkout main
+    merge stage tag: "ship"
+```
+
+Real branch names:
+- task branch: `feature/cache`
+- stage branch: `joan-stage/feature/cache`
+
+## Commands
+
+Start a task:
 
 ```bash
-# If this branch predates Joan tracking or was created outside Joan,
-# register its parent branch once before the first review:
-uv run joan branch adopt --base-ref origin/main
+uv run joan task start feature/cache --from origin/main
+```
 
-# Create a review branch and open a PR
-uv run joan branch create
-uv run joan pr create --title "Add feature X"
+Open the first or next PR:
 
-# Check review status
+```bash
+uv run joan pr create --title "Add cache layer"
+```
+
+Inspect state:
+
+```bash
 uv run joan pr sync
-
-# See unresolved comments
 uv run joan pr comments
-
-# Resolve a comment after addressing it
-uv run joan pr comment resolve <id>
-
-# Merge the approved review branch back into the local base branch
-uv run joan pr finish
-
-# Push that finished base branch upstream when you're ready
-uv run joan pr push
+uv run joan pr reviews
 ```
 
-`joan pr create` requests review from the configured human user by default. Pass `--no-request-human-review` if you need to skip that.
-Use `joan branch adopt` only on the first Joan review for an existing branch, or when the branch is stacked on top of another non-`main` branch and you need to choose the parent explicitly.
-
-## Planning
-
-Use your preferred planning process first, then let Joan review the completed plan document:
+Push another review round after fixes:
 
 ```bash
-uv run joan plan create cache-invalidation --title "Cache invalidation strategy"
+uv run joan task push
 ```
 
-This creates a plan file under `docs/plans/`, puts it on a dedicated review branch, and opens a PR for feedback.
-
-After approval, land the plan locally with:
+Finish the approved PR:
 
 ```bash
 uv run joan pr finish
 ```
 
-## Contributor notes
-
-If you are editing Joan itself, the integration assets live here:
-
-- `hooks/` for the Claude hook definition and shell script
-- `skills/` for the canonical authored skill tree
-- `.agents/skills/` for the repo-local Codex mirror
-- `src/joan/data/codex-skills/` for the packaged Codex mirror used by `joan skills install --agent codex`
-
-After editing anything under `skills/`, refresh both Codex mirrors:
+Prepare the final upstream branch:
 
 ```bash
-uv run python scripts/sync_skills.py
+uv run joan ship --as sam/cache-layer
 ```
+
+## Rules
+
+- Do not work on `joan-stage/*` directly.
+- Every Forgejo PR should go from the task branch to the matching stage branch.
+- `joan pr finish` merges into the stage branch, not into `main`.
+- `joan ship` prepares the final upstream branch; it does not open the GitHub PR.

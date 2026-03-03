@@ -38,14 +38,20 @@ Parse `.joan/agents/phil.toml` to confirm the agent name is `phil`.
 
 ## Step 3 — Get the diff
 
-Determine the base branch from the current branch name. Joan review branches
-follow the pattern `joan-review/<base-branch>--rN`. Extract `<base-branch>`
-from this pattern.
+Determine the current working branch:
+
+```bash
+git rev-parse --abbrev-ref HEAD
+```
+
+Then derive the stage branch as `joan-stage/<current-branch>`, fetch the review
+remote, and diff against that staged branch.
 
 Then get the diff:
 
 ```bash
-git diff <base-branch>..HEAD
+git fetch joan-review
+git diff joan-review/joan-stage/<current-branch>..HEAD
 ```
 
 If the diff is empty, stop and tell the user there are no changes to review.

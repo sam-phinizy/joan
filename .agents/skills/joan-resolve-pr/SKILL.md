@@ -103,7 +103,7 @@ After addressing all comments:
 ```bash
 git add <changed-files>
 git commit -m "Address review feedback"
-uv run joan branch push
+uv run joan task push
 ```
 
 ### 5. Update PR and notify reviewer
@@ -180,7 +180,7 @@ Stop and ask the user if:
 ```bash
 git add <changed-files>
 git commit -m "Implement reviewer-requested changes"
-uv run joan branch push
+uv run joan task push
 ```
 
 ### 5. Update PR and notify reviewer
@@ -216,16 +216,15 @@ uv run joan pr finish
 
 On success:
 ```
-Merged PR #N and cleaned up joan-review/feature-x--r1
+Merged PR #N into joan-stage/feature-x
 ```
 
-The PR is merged on Forgejo, the review branch is deleted (locally and on the
-remote), and the merged changes are pulled into the local base branch.
+The PR is merged on Forgejo into the task's stage branch.
 
 Only if the user explicitly wants to publish upstream later, switch to the base
 branch and run:
 ```bash
-uv run joan pr push
+uv run joan ship
 ```
 
 ---
@@ -238,8 +237,8 @@ uv run joan pr push
 | `uv run joan pr comments` | List unresolved PR-level and inline comments | JSON array of comment objects |
 | `uv run joan pr reviews` | List review submissions with body text | JSON array: `[{id, state, body, author, submitted_at}]` |
 | `uv run joan pr comment resolve <id>` | Mark a comment resolved | `Resolved comment <id>` |
-| `uv run joan branch push` | Push current branch for re-review | `Pushed branch: {branch}` |
-| `uv run joan pr finish` | Merge PR on Forgejo, pull result, clean up review branch | `Merged PR #N and cleaned up {review_branch}` |
-| `uv run joan pr push` | Push finished base branch upstream (run from base branch) | `Pushed {branch} to origin/{branch}` |
+| `uv run joan task push` | Push current task branch for re-review | `Pushed task branch: {branch}` |
+| `uv run joan pr finish` | Merge PR on Forgejo into the stage branch | `Merged PR #N into joan-stage/{branch}` |
+| `uv run joan ship` | Push a clean publish branch upstream | `Prepared publish branch ...` |
 | `uv run joan pr comment post --body "..."` | Post a general discussion comment on the PR | `Posted comment on PR #N` |
 | `uv run joan pr update --body "..."` | Update the PR description | `Updated PR #N description` |

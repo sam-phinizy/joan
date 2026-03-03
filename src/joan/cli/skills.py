@@ -10,7 +10,16 @@ app = typer.Typer(help="Install or refresh Joan's agent-specific skills and plug
 
 _SUPPORTED_AGENTS = {"claude", "codex"}
 
-_CLAUDE_SKILL_NAMES = ("joan-setup", "joan-review", "joan-resolve-pr-comments", "joan-plan", "joan-adopt-branch")
+_LEGACY_CLAUDE_SKILL_NAMES = (
+    "joan-setup",
+    "joan-task",
+    "joan-review",
+    "joan-resolve-pr",
+    "joan-pr-comment",
+    "phil-review",
+    "joan-plan",
+    "joan-adopt-branch",
+)
 
 
 def _install_dest(agent: str) -> Path:
@@ -41,7 +50,7 @@ def _source_for(agent: str) -> Path:
 def _remove_legacy_claude(cwd: Path) -> None:
     # Legacy 1: per-repo skills in .claude/skills/
     removed = False
-    for name in _CLAUDE_SKILL_NAMES:
+    for name in _LEGACY_CLAUDE_SKILL_NAMES:
         legacy = cwd / ".claude" / "skills" / name
         if legacy.exists():
             shutil.rmtree(legacy)

@@ -1,6 +1,6 @@
 [project]
 name = "joan"
-version = "0.3.1"
+version = "0.4.0"
 description = "Local code review gate for AI agents via Forgejo"
 readme = "README.md"
 authors = [
