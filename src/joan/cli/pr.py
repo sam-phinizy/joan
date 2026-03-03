@@ -11,7 +11,7 @@ from joan.cli._common import (
     forgejo_client_for_agent_or_exit,
     load_config_or_exit,
 )
-from joan.core.branch_state import save_branch_state
+from joan.core.branch_state import save_review_checkpoint
 from joan.core.forgejo import (
     build_create_pr_payload,
     compute_sync_status,
@@ -21,7 +21,15 @@ from joan.core.forgejo import (
     parse_pr_response,
     parse_reviews,
 )
-from joan.core.git import checkout_branch_args, delete_branch_args, merge_ff_only_args, push_branch_args, rev_parse_args, working_branch_for_review
+from joan.core.git import (
+    checkout_branch_args,
+    delete_branch_args,
+    is_plan_review_branch,
+    merge_ff_only_args,
+    push_branch_args,
+    rev_parse_args,
+    working_branch_for_review,
+)
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Open Forgejo PRs, inspect review state, finish approved PRs locally, and push upstream separately.")
@@ -258,9 +266,11 @@ def pr_finish() -> None:
     except Exception:  # noqa: BLE001
         pass  # branch may already be deleted by Forgejo merge
 
-    # Update branch state so the next review round uses the current HEAD as base.
+    # Only code-review PRs advance the review checkpoint. Plan PRs should not
+    # hide older unreviewed code on the same working branch.
     new_head = run_git(rev_parse_args("HEAD"))
-    save_branch_state(pr.base_ref, new_head)
+    if not is_plan_review_branch(review_branch):
+        save_review_checkpoint(pr.base_ref, new_head)
 
     typer.echo(f"Merged PR #{pr.number} and cleaned up {review_branch}")
 

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import typer
 
-from joan.cli._common import load_config_or_exit
-from joan.core.branch_state import load_branch_state, save_branch_state
+from joan.cli._common import ensure_branch_tracking, load_config_or_exit
+from joan.core.branch_state import save_branch_start
 from joan.core.git import (
     create_branch_args,
     current_branch_args,
@@ -12,10 +12,29 @@ from joan.core.git import (
     push_refspec_args,
     rev_parse_args,
     review_branch_name,
+    working_branch_for_review,
 )
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Create and push `joan-review/*` branches for the local Forgejo review flow.")
+
+
+@app.command("adopt", help="Record a working branch's starting point so Joan can base the first review PR correctly.")
+def branch_adopt(
+    base_ref: str = typer.Option(..., "--base-ref", help="Git ref this branch forked from (for example `origin/main` or `feature/base`)."),
+    branch: str | None = typer.Option(None, "--branch", help="Working branch to register. Defaults to the current branch."),
+) -> None:
+    target_branch = (branch or run_git(current_branch_args())).strip()
+    if not target_branch:
+        typer.echo("Branch cannot be empty.", err=True)
+        raise typer.Exit(code=2)
+    if working_branch_for_review(target_branch):
+        typer.echo("Use a non-review working branch with `joan branch adopt`.", err=True)
+        raise typer.Exit(code=2)
+
+    branch_start_sha = run_git(merge_base_args(base_ref, target_branch))
+    save_branch_start(target_branch, branch_start_sha)
+    typer.echo(f"Registered branch start for {target_branch}: {branch_start_sha} (base ref: {base_ref})")
 
 
 @app.command("create", help="Create a `joan-review/*` branch from the current branch and push the base branch first.")
@@ -34,43 +53,17 @@ def branch_create(
         raise typer.Exit(code=2)
 
     head_sha = run_git(rev_parse_args("HEAD"))
-
-    # Determine the base SHA for the remote base branch.
-    # Use stored state from a previous review round if available.
-    base_sha = load_branch_state(working_branch)
-
-    if base_sha is None:
-        # First review round: find where this branch diverged from the
-        # mainline.  Try several common refs in order of likelihood.
-        candidates = [
-            f"{config.remotes.upstream}/main",
-            f"{config.remotes.upstream}/master",
-            f"{config.remotes.upstream}/HEAD",
-            "main",
-            "master",
-        ]
-        for ref in candidates:
-            try:
-                base_sha = run_git(merge_base_args(ref, "HEAD"))
-                break
-            except Exception:  # noqa: BLE001
-                continue
-        else:
-            typer.echo(
-                "Could not determine base SHA. Ensure you have fetched from upstream, "
-                "or create a `.joan/branch-state.json` manually.",
-                err=True,
-            )
-            raise typer.Exit(code=1)
+    state = ensure_branch_tracking(config, working_branch)
+    base_sha = state.review_checkpoint_sha or state.branch_start_sha
+    if not base_sha:
+        typer.echo("Missing branch tracking state. Run `uv run joan branch adopt --base-ref <ref>` first.", err=True)
+        raise typer.Exit(code=1)
 
     if base_sha == head_sha:
         typer.echo("Warning: no new commits to review (base SHA == HEAD).", err=True)
 
     # Push base SHA as the working branch on the review remote.
     run_git(push_refspec_args(config.remotes.review, base_sha, f"refs/heads/{working_branch}"))
-
-    # Save state for future rounds.
-    save_branch_state(working_branch, head_sha)
 
     run_git(create_branch_args(review_branch))
     typer.echo(f"Created review branch: {review_branch} (base: {working_branch})")

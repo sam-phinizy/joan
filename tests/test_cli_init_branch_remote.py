@@ -5,11 +5,12 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+import joan.cli._common as common_mod
 import joan.cli.branch as branch_mod
 import joan.core.git as git_mod
 import joan.cli.init as init_mod
 import joan.cli.remote as remote_mod
-from joan.core.branch_state import load_branch_state, save_branch_state
+from joan.core.branch_state import BranchState, load_branch_state, save_branch_start, save_review_checkpoint
 from joan.core.models import Config, ForgejoConfig, RemotesConfig
 
 
@@ -149,6 +150,7 @@ def test_branch_create_with_generated_name(monkeypatch, tmp_path) -> None:
         return ""
 
     monkeypatch.setattr(branch_mod, "run_git", fake_run_git)
+    monkeypatch.setattr(common_mod, "run_git", fake_run_git)
 
     result = runner.invoke(branch_mod.app, ["create"])
 
@@ -162,9 +164,49 @@ def test_branch_create_with_generated_name(monkeypatch, tmp_path) -> None:
     assert calls[4] == ["checkout", "-b", "joan-review/feature/cache--r1"]
     assert "Created review branch: joan-review/feature/cache--r1 (base: feature/cache)" in result.output
 
-    # Verify branch state was saved
+    # Verify branch tracking was initialized from the branch start, but no
+    # review checkpoint was recorded yet.
     state = json.loads((tmp_path / ".joan" / "branch-state.json").read_text())
-    assert state["branches"]["feature/cache"]["base_sha"] == "abc123"
+    assert state["branches"]["feature/cache"]["branch_start_sha"] == "base000"
+    assert "review_checkpoint_sha" not in state["branches"]["feature/cache"]
+
+
+def test_branch_adopt_records_branch_start(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+
+    monkeypatch.chdir(tmp_path)
+
+    def fake_run_git(args):
+        calls.append(args)
+        if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+            return "feature/cache"
+        if args == ["merge-base", "origin/main", "feature/cache"]:
+            return "base000"
+        return ""
+
+    monkeypatch.setattr(branch_mod, "run_git", fake_run_git)
+
+    result = runner.invoke(branch_mod.app, ["adopt", "--base-ref", "origin/main"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [
+        ["rev-parse", "--abbrev-ref", "HEAD"],
+        ["merge-base", "origin/main", "feature/cache"],
+    ]
+    assert "Registered branch start for feature/cache: base000" in result.output
+    assert load_branch_state("feature/cache") == BranchState(branch_start_sha="base000")
+
+
+def test_branch_adopt_rejects_review_branch(monkeypatch) -> None:
+    runner = CliRunner()
+
+    monkeypatch.setattr(branch_mod, "run_git", lambda args: "joan-review/feat--r1" if args == ["rev-parse", "--abbrev-ref", "HEAD"] else "")
+
+    result = runner.invoke(branch_mod.app, ["adopt", "--base-ref", "origin/main"])
+
+    assert result.exit_code == 2
+    assert "non-review working branch" in result.output
 
 
 def test_branch_push_current_branch(monkeypatch) -> None:
@@ -265,21 +307,28 @@ def test_remote_add_updates_existing_remote(monkeypatch) -> None:
 def test_branch_state_round_trip(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
-    assert load_branch_state("feature/foo") is None
+    assert load_branch_state("feature/foo") == BranchState()
 
-    save_branch_state("feature/foo", "abc123")
-    assert load_branch_state("feature/foo") == "abc123"
+    save_branch_start("feature/foo", "base000")
+    assert load_branch_state("feature/foo") == BranchState(branch_start_sha="base000")
 
-    save_branch_state("feature/foo", "def456")
-    assert load_branch_state("feature/foo") == "def456"
+    save_review_checkpoint("feature/foo", "abc123")
+    assert load_branch_state("feature/foo") == BranchState(
+        branch_start_sha="base000",
+        review_checkpoint_sha="abc123",
+    )
 
-    save_branch_state("feature/bar", "ghi789")
-    assert load_branch_state("feature/foo") == "def456"
-    assert load_branch_state("feature/bar") == "ghi789"
+    save_review_checkpoint("feature/foo", "def456")
+    save_review_checkpoint("feature/bar", "ghi789")
+    assert load_branch_state("feature/foo") == BranchState(
+        branch_start_sha="base000",
+        review_checkpoint_sha="def456",
+    )
+    assert load_branch_state("feature/bar") == BranchState(review_checkpoint_sha="ghi789")
 
 
-def test_branch_create_uses_stored_base_sha(monkeypatch, tmp_path) -> None:
-    """Second review round: stored base SHA is used instead of computing merge-base."""
+def test_branch_create_uses_stored_review_checkpoint(monkeypatch, tmp_path) -> None:
+    """Second review round: stored review checkpoint is used instead of recomputing branch start."""
     runner = CliRunner()
     calls: list[list[str]] = []
 
@@ -288,7 +337,7 @@ def test_branch_create_uses_stored_base_sha(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
 
     # Pre-populate stored state from a previous review round.
-    save_branch_state("feature/cache", "prev_head_sha")
+    save_review_checkpoint("feature/cache", "prev_head_sha")
 
     def fake_run_git(args):
         calls.append(args)
@@ -299,16 +348,16 @@ def test_branch_create_uses_stored_base_sha(monkeypatch, tmp_path) -> None:
         return ""
 
     monkeypatch.setattr(branch_mod, "run_git", fake_run_git)
+    monkeypatch.setattr(common_mod, "run_git", fake_run_git)
 
     result = runner.invoke(branch_mod.app, ["create"])
 
     assert result.exit_code == 0, result.output
-    # Should push the stored base SHA, not HEAD
+    # Should push the stored checkpoint SHA, not HEAD
     assert ["push", "joan-review", "prev_head_sha:refs/heads/feature/cache"] in calls
-    # Should NOT call ls-remote or merge-base since we have stored state
-    ls_remote_calls = [c for c in calls if c[:2] == ["ls-remote", "joan-review"]]
-    assert len(ls_remote_calls) == 0
+    merge_base_calls = [c for c in calls if c[:2] == ["merge-base", "origin/main"]]
+    assert not merge_base_calls
 
-    # Verify branch state was updated to new HEAD
+    # Verify branch tracking was not moved just by opening a new review PR.
     state = json.loads((tmp_path / ".joan" / "branch-state.json").read_text())
-    assert state["branches"]["feature/cache"]["base_sha"] == "new_head_sha"
+    assert state["branches"]["feature/cache"]["review_checkpoint_sha"] == "prev_head_sha"

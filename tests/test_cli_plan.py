@@ -20,6 +20,7 @@ def test_plan_create_without_opening_pr(monkeypatch, sample_config) -> None:
 
     monkeypatch.setattr(plan_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(plan_mod, "current_branch", lambda: "main")
+    monkeypatch.setattr(plan_mod, "ensure_branch_tracking", lambda _cfg, _branch: None)
     monkeypatch.setattr(plan_mod, "run_git", lambda args: calls.append(args) or "")
     monkeypatch.setattr(plan_mod, "date", FakeDate)
 
@@ -66,6 +67,7 @@ def test_plan_create_opens_pr_and_requests_human_review(monkeypatch, sample_conf
 
     monkeypatch.setattr(plan_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(plan_mod, "current_branch", lambda: "main")
+    monkeypatch.setattr(plan_mod, "ensure_branch_tracking", lambda _cfg, _branch: None)
     monkeypatch.setattr(plan_mod, "run_git", lambda args: calls.append(args) or "")
     monkeypatch.setattr(plan_mod, "forgejo_client", lambda _cfg: FakeClient())
     monkeypatch.setattr(plan_mod, "date", FakeDate)
@@ -108,6 +110,7 @@ def test_plan_create_uses_explicit_title_and_base(monkeypatch, sample_config) ->
 
     monkeypatch.setattr(plan_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(plan_mod, "current_branch", lambda: "feature/wip")
+    monkeypatch.setattr(plan_mod, "ensure_branch_tracking", lambda _cfg, _branch: None)
     monkeypatch.setattr(plan_mod, "run_git", lambda args: calls.append(args) or "")
     monkeypatch.setattr(plan_mod, "forgejo_client", lambda _cfg: FakeClient())
     monkeypatch.setattr(plan_mod, "date", FakeDate)
@@ -149,6 +152,7 @@ def test_plan_create_rejects_existing_plan_file(monkeypatch, sample_config) -> N
 
     monkeypatch.setattr(plan_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(plan_mod, "current_branch", lambda: "main")
+    monkeypatch.setattr(plan_mod, "ensure_branch_tracking", lambda _cfg, _branch: None)
     monkeypatch.setattr(plan_mod, "run_git", lambda args: calls.append(args) or "")
     monkeypatch.setattr(plan_mod, "date", FakeDate)
 
@@ -162,3 +166,20 @@ def test_plan_create_rejects_existing_plan_file(monkeypatch, sample_config) -> N
         assert result.exit_code == 2
         assert "plan already exists" in result.output
         assert calls == []
+
+
+def test_plan_create_initializes_tracking_for_current_base(monkeypatch, sample_config) -> None:
+    runner = CliRunner()
+    tracked: list[tuple[object, str]] = []
+
+    monkeypatch.setattr(plan_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(plan_mod, "current_branch", lambda: "feature/wip")
+    monkeypatch.setattr(plan_mod, "ensure_branch_tracking", lambda cfg, branch: tracked.append((cfg, branch)) or None)
+    monkeypatch.setattr(plan_mod, "run_git", lambda _args: "")
+    monkeypatch.setattr(plan_mod, "date", FakeDate)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(plan_mod.app, ["create", "foo", "--no-open-pr"])
+
+    assert result.exit_code == 0, result.output
+    assert tracked == [(sample_config, "feature/wip")]

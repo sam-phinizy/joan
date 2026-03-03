@@ -300,6 +300,7 @@ def test_pr_finish_approval_gates_and_merges(monkeypatch, sample_config, sample_
     calls: list[list[str]] = []
     merge_calls: list[tuple] = []
     delete_calls: list[tuple] = []
+    checkpoint_calls: list[tuple[str, str]] = []
 
     class FakeClient:
         def __init__(self, reviews):
@@ -319,7 +320,14 @@ def test_pr_finish_approval_gates_and_merges(monkeypatch, sample_config, sample_
     sample_pr.base_ref = "feat"
     monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg: sample_pr)
     monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat")
-    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+    def fake_run_git(args):
+        calls.append(args)
+        if args == ["rev-parse", "HEAD"]:
+            return "new_head_sha"
+        return ""
+
+    monkeypatch.setattr(pr_mod, "run_git", fake_run_git)
+    monkeypatch.setattr(pr_mod, "save_review_checkpoint", lambda branch, sha: checkpoint_calls.append((branch, sha)))
 
     # Not approved → exit 1
     monkeypatch.setattr(
@@ -349,6 +357,7 @@ def test_pr_finish_approval_gates_and_merges(monkeypatch, sample_config, sample_
     assert ["checkout", "feat"] in calls
     assert ["pull", "joan-review", "feat"] in calls
     assert ["branch", "-D", "joan-review/feat"] in calls
+    assert checkpoint_calls == [("feat", "new_head_sha")]
     assert f"Merged PR #{sample_pr.number}" in ok.output
 
 
@@ -367,6 +376,7 @@ def test_pr_push_requires_finished_branch(monkeypatch, sample_config) -> None:
 def test_pr_finish_merges_suffixed_review_branch(monkeypatch, sample_config, sample_pr) -> None:
     runner = CliRunner()
     calls: list[list[str]] = []
+    checkpoint_calls: list[tuple[str, str]] = []
 
     class FakeClient:
         def get_reviews(self, *_args, **_kwargs):
@@ -382,14 +392,22 @@ def test_pr_finish_merges_suffixed_review_branch(monkeypatch, sample_config, sam
     sample_pr.base_ref = "feat"
     monkeypatch.setattr(pr_mod, "current_pr_or_exit", lambda _cfg: sample_pr)
     monkeypatch.setattr(pr_mod, "current_branch", lambda: "joan-review/feat--plan-cache")
-    monkeypatch.setattr(pr_mod, "run_git", lambda args: calls.append(args) or "")
+    def fake_run_git(args):
+        calls.append(args)
+        if args == ["rev-parse", "HEAD"]:
+            return "new_head_sha"
+        return ""
+
+    monkeypatch.setattr(pr_mod, "run_git", fake_run_git)
     monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "save_review_checkpoint", lambda branch, sha: checkpoint_calls.append((branch, sha)))
 
     result = runner.invoke(pr_mod.app, ["finish"])
 
     assert result.exit_code == 0, result.output
     assert ["checkout", "feat"] in calls
     assert ["branch", "-D", "joan-review/feat--plan-cache"] in calls
+    assert checkpoint_calls == []
 
 
 def test_pr_push_pushes_current_branch(monkeypatch, sample_config) -> None:

@@ -114,3 +114,16 @@ def working_branch_for_review(branch: str) -> str | None:
         return None
     base_branch = branch[len(prefix) :].split("--", 1)[0]
     return base_branch or None
+
+
+def review_branch_topic(branch: str) -> str | None:
+    prefix = "joan-review/"
+    if not branch.startswith(prefix):
+        return None
+    _, _, topic = branch[len(prefix) :].partition("--")
+    return topic or None
+
+
+def is_plan_review_branch(branch: str) -> bool:
+    topic = review_branch_topic(branch)
+    return bool(topic and topic.startswith("plan-"))

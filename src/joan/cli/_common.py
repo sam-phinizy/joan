@@ -5,7 +5,9 @@ from pathlib import Path
 
 import typer
 
+from joan.core.branch_state import BranchState, load_branch_state, save_branch_start
 from joan.core.forgejo import parse_pr_response
+from joan.core.git import merge_base_args
 from joan.core.models import Config, PullRequest
 from joan.shell.agent_config_io import read_agent_config
 from joan.shell.config_io import read_config
@@ -46,6 +48,34 @@ def current_branch() -> str:
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Failed to read current branch: {exc}", err=True)
         raise typer.Exit(code=2)
+
+
+def ensure_branch_tracking(config: Config, branch: str) -> BranchState:
+    state = load_branch_state(branch)
+    if state.branch_start_sha or state.review_checkpoint_sha:
+        return state
+
+    candidates = [
+        f"{config.remotes.upstream}/main",
+        f"{config.remotes.upstream}/master",
+        f"{config.remotes.upstream}/HEAD",
+        "main",
+        "master",
+    ]
+    for ref in candidates:
+        try:
+            branch_start_sha = run_git(merge_base_args(ref, "HEAD"))
+            save_branch_start(branch, branch_start_sha)
+            return BranchState(branch_start_sha=branch_start_sha)
+        except Exception:  # noqa: BLE001
+            continue
+
+    typer.echo(
+        "Could not determine branch start SHA. Ensure you have fetched from upstream, "
+        "or create a `.joan/branch-state.json` entry manually.",
+        err=True,
+    )
+    raise typer.Exit(code=1)
 
 
 def current_pr_or_exit(

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import typer
 
-from joan.cli._common import current_branch, forgejo_client, load_config_or_exit
+from joan.cli._common import current_branch, ensure_branch_tracking, forgejo_client, load_config_or_exit
 from joan.core.forgejo import build_create_pr_payload, parse_pr_response
 from joan.core.git import create_branch_args, push_branch_args, review_branch_name, working_branch_for_review
 from joan.core.plans import (
@@ -53,6 +53,8 @@ def plan_create(
     if not resolved_base:
         typer.echo("Base branch cannot be empty.", err=True)
         raise typer.Exit(code=2)
+    if resolved_base == branch:
+        ensure_branch_tracking(config, resolved_base)
     try:
         normalized_slug = normalize_plan_slug(slug)
     except PlanError as exc:

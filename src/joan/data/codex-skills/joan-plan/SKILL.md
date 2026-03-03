@@ -38,6 +38,10 @@ Use:
 uv run joan plan create <slug> [--title "Readable title"]
 ```
 
+If the current branch predates Joan tracking and the user wants to choose the
+parent branch explicitly before opening the first Joan review on it, invoke
+`/joan:joan-adopt-branch` first.
+
 Behavior:
 
 - creates a Markdown plan file in `docs/plans/`

@@ -39,6 +39,10 @@ Before doing anything, figure out where you are in the review cycle:
    ```
    If on `main`, stop and create a real working branch first. Joan review branches should be created from an existing non-`main` working branch.
 
+   If the current working branch predates Joan tracking or was created outside
+   Joan and the user wants to choose the parent branch explicitly, invoke
+   `/joan:joan-adopt-branch` before creating the first review PR.
+
 3. **Check for existing PR**:
    ```
    uv run joan pr sync
@@ -62,6 +66,10 @@ Use this when starting fresh work that needs review.
 ### 1. Create a review branch
 
 Always do this before `uv run joan pr create` unless you intentionally plan to pass `--base` from a non-review branch. The normal Joan flow is to open PRs from a `joan-review/...` branch.
+
+If this is the first Joan review on an existing branch and the branch base is
+ambiguous, stop and run `/joan:joan-adopt-branch` first so the user can choose
+the correct parent branch.
 
 ```
 uv run joan branch create [name]
