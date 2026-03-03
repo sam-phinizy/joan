@@ -221,7 +221,10 @@ def test_pr_sync(monkeypatch, sample_config, sample_pr) -> None:
             return [{"id": 1, "state": "APPROVED", "submitted_at": None, "user": {"login": "r"}}]
 
         def get_comments(self, *_args, **_kwargs):
-            return [{"id": 9, "resolved": False, "user": {"login": "r"}}]
+            return [
+                {"id": 9, "resolved": False, "user": {"login": "r"}},
+                {"id": 10, "resolved": False, "user": {"login": sample_config.forgejo.owner}},
+            ]
 
     monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
     monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
@@ -242,6 +245,7 @@ def test_pr_comments_and_resolve(monkeypatch, sample_config, sample_pr) -> None:
             return [
                 {"id": 1, "resolved": False, "user": {"login": "r"}},
                 {"id": 2, "resolved": True, "user": {"login": "r"}},
+                {"id": 3, "resolved": False, "user": {"login": sample_config.forgejo.owner}},
             ]
 
         def resolve_comment(self, *_args, **_kwargs):

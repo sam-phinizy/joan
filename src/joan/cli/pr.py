@@ -15,6 +15,7 @@ from joan.core.branch_state import save_review_checkpoint
 from joan.core.forgejo import (
     build_create_pr_payload,
     compute_sync_status,
+    exclude_comments_by_author,
     format_comments_json,
     format_reviews_json,
     parse_comments,
@@ -131,6 +132,7 @@ def pr_sync() -> None:
 
     reviews = parse_reviews(client.get_reviews(config.forgejo.owner, config.forgejo.repo, pr.number))
     comments = parse_comments(client.get_comments(config.forgejo.owner, config.forgejo.repo, pr.number))
+    comments = exclude_comments_by_author(comments, config.forgejo.owner)
     sync = compute_sync_status(reviews, comments)
 
     typer.echo(
@@ -174,6 +176,7 @@ def pr_comments(
     pr = current_pr_or_exit(config, pr_number=pr_number, branch=branch.strip() if branch else None)
 
     comments = parse_comments(client.get_comments(config.forgejo.owner, config.forgejo.repo, pr.number))
+    comments = exclude_comments_by_author(comments, config.forgejo.owner)
     typer.echo(format_comments_json(comments, include_resolved=all_comments))
 
 

@@ -69,6 +69,10 @@ def compute_sync_status(reviews: list[Review], comments: list[Comment]) -> PRSyn
     )
 
 
+def exclude_comments_by_author(comments: list[Comment], author: str) -> list[Comment]:
+    return [comment for comment in comments if comment.author != author]
+
+
 def format_comments_json(comments: list[Comment], include_resolved: bool = False) -> str:
     selected = comments if include_resolved else [c for c in comments if not c.resolved]
     payload = [

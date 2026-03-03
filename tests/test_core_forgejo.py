@@ -8,6 +8,7 @@ from joan.core.forgejo import (
     build_create_pr_payload,
     build_create_repo_payload,
     compute_sync_status,
+    exclude_comments_by_author,
     format_comments_json,
     format_reviews_json,
     parse_comments,
@@ -124,6 +125,17 @@ def test_format_comments_json_filters_resolved() -> None:
     assert unresolved[0]["id"] == 1
     assert unresolved[0]["created_at"].endswith("Z")
     assert len(all_comments) == 2
+
+
+def test_exclude_comments_by_author() -> None:
+    comments = [
+        Comment(id=1, body="bot", path="", line=None, resolved=False, author="joan", created_at=None),
+        Comment(id=2, body="reviewer", path="", line=None, resolved=False, author="sam", created_at=None),
+    ]
+
+    filtered = exclude_comments_by_author(comments, "joan")
+
+    assert [comment.id for comment in filtered] == [2]
 
 
 def test_parse_dt_handles_invalid_values() -> None:
