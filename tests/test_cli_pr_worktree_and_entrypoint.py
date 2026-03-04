@@ -14,6 +14,7 @@ def test_root_cli_has_expected_commands() -> None:
 
     assert result.exit_code == 0
     assert "task" in result.output
+    assert "issue" in result.output
     assert "ship" in result.output
 
 

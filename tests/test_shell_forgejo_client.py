@@ -457,6 +457,125 @@ def test_create_issue_comment_posts_to_issues_endpoint(monkeypatch) -> None:
     assert result == {"id": 42}
 
 
+def test_create_get_list_and_close_issue_endpoints(monkeypatch) -> None:
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(self, method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if method == "POST":
+            return {"number": 9, "title": "Bug"}
+        if method == "GET" and path.endswith("/issues/9"):
+            return {"number": 9, "title": "Bug", "state": "open"}
+        if method == "GET" and path.endswith("/issues"):
+            return [{"number": 9, "title": "Bug", "state": "open"}]
+        if method == "PATCH":
+            return {"number": 9, "state": "closed"}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+
+    created = client.create_issue("sam", "joan", "Bug", "details")
+    issue = client.get_issue("sam", "joan", 9)
+    issues = client.list_issues("sam", "joan", state="all", limit=25)
+    closed = client.close_issue("sam", "joan", 9)
+
+    assert created["number"] == 9
+    assert issue["state"] == "open"
+    assert len(issues) == 1
+    assert closed["state"] == "closed"
+    assert calls[0] == (
+        "POST",
+        "/api/v1/repos/sam/joan/issues",
+        {"json": {"title": "Bug", "body": "details"}},
+    )
+    assert calls[2] == (
+        "GET",
+        "/api/v1/repos/sam/joan/issues",
+        {"params": {"state": "all", "limit": "25"}},
+    )
+    assert calls[3] == (
+        "PATCH",
+        "/api/v1/repos/sam/joan/issues/9",
+        {"json": {"state": "closed"}},
+    )
+
+
+def test_add_issue_dependency_retries_payload_shapes(monkeypatch) -> None:
+    calls: list[dict] = []
+
+    def fake_request_json(self, method, path, **kwargs):
+        calls.append(kwargs.get("json", {}))
+        if len(calls) == 1:
+            raise ForgejoError("Forgejo API 422: invalid payload")
+        return {"ok": True}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+
+    result = client.add_issue_dependency("sam", "joan", 10, 4)
+
+    assert result == {"ok": True}
+    assert calls[0] == {"index": 4}
+    assert calls[1] == {"owner": "sam", "repo": "joan", "index": 4}
+
+
+def test_list_issue_blocked_by_uses_dependencies_endpoint(monkeypatch) -> None:
+    calls: list[tuple[str, str, dict]] = []
+
+    def fake_request_json(self, method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        if path.endswith("/dependencies"):
+            return [{"number": 2, "title": "A"}]
+        raise AssertionError(path)
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+
+    result = client.list_issue_blocked_by("sam", "joan", 7)
+
+    assert result == [{"number": 2, "title": "A"}]
+    assert calls == [
+        (
+            "GET",
+            "/api/v1/repos/sam/joan/issues/7/dependencies",
+            {},
+        )
+    ]
+
+
+def test_list_issue_blocks_falls_back_to_scan(monkeypatch) -> None:
+    client = ForgejoClient("http://forgejo.local", "tok")
+
+    monkeypatch.setattr(
+        client,
+        "_list_issue_relation",
+        lambda **_kwargs: ([], False),
+    )
+    monkeypatch.setattr(
+        client,
+        "list_issues",
+        lambda owner, repo, state="open", limit=50: [
+            {"number": 1, "title": "root"},
+            {"number": 2, "title": "other"},
+            {"number": 3, "title": "child"},
+        ],
+    )
+
+    def fake_blocked_by(_owner, _repo, issue_number):
+        if issue_number == 2:
+            return []
+        if issue_number == 3:
+            return [{"number": 1, "title": "root"}]
+        return []
+
+    monkeypatch.setattr(client, "list_issue_blocked_by", fake_blocked_by)
+
+    result = client.list_issue_blocks("sam", "joan", 1)
+
+    assert result == [{"number": 3, "title": "child"}]
+
+
 def test_update_pr_patches_pull_body(monkeypatch) -> None:
     captured: dict = {}
 

@@ -69,6 +69,13 @@ uv run joan ship --as sam/redshift-query
 | `joan pr comments` | Show PR comments as JSON |
 | `joan pr reviews` | Show review submissions as JSON |
 | `joan pr finish` | Merge the approved PR into the stage branch |
+| `joan issue create "TITLE" [--body TEXT]` | Create an issue |
+| `joan issue link <issue> <blocked-by-issue>` | Link issue dependencies |
+| `joan issue close <issue>` | Close an issue |
+| `joan issue read [--issue N] [--state ...] [--limit N]` | Read one or many issues as JSON |
+| `joan issue blocked-by <issue>` | List blockers for an issue as JSON |
+| `joan issue blocks <issue>` | List downstream blocked issues as JSON |
+| `joan issue graph <issue> [--depth N]` | Issue dependency graph as JSON |
 | `joan ship [--as BRANCH]` | Prepare and push the final upstream publish branch |
 
 ## Skills
@@ -78,6 +85,7 @@ uv run joan ship --as sam/redshift-query
 - `joan-review`: open or advance a Forgejo review PR
 - `joan-resolve-pr`: drive the PR state machine
 - `joan-pr-comment`: post or update PR comments
+- `joan-create-issue`: create/link/close/read issues and dependency graph JSON
 - `phil-review`: trigger Phil’s on-demand AI review
 
 ## Notes

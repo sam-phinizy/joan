@@ -202,6 +202,87 @@ class ForgejoClient:
         payload = {"body": body}
         return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/issues/{index}/comments", json=payload)
 
+    def create_issue(self, owner: str, repo: str, title: str, body: str | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"title": title}
+        if body:
+            payload["body"] = body
+        return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/issues", json=payload)
+
+    def get_issue(self, owner: str, repo: str, index: int) -> dict[str, Any]:
+        return self._request_json("GET", f"/api/v1/repos/{owner}/{repo}/issues/{index}")
+
+    def list_issues(self, owner: str, repo: str, state: str = "open", limit: int = 50) -> list[dict[str, Any]]:
+        params = {"state": state, "limit": str(limit)}
+        data = self._request_json("GET", f"/api/v1/repos/{owner}/{repo}/issues", params=params)
+        return list(data)
+
+    def close_issue(self, owner: str, repo: str, index: int) -> dict[str, Any]:
+        return self._request_json("PATCH", f"/api/v1/repos/{owner}/{repo}/issues/{index}", json={"state": "closed"})
+
+    def add_issue_dependency(self, owner: str, repo: str, index: int, dependency_index: int) -> dict[str, Any]:
+        path = f"/api/v1/repos/{owner}/{repo}/issues/{index}/dependencies"
+        payloads = [
+            {"index": dependency_index},
+            {"owner": owner, "repo": repo, "index": dependency_index},
+            {"issue_index": dependency_index},
+            {"owner": owner, "repo": repo, "issue_index": dependency_index},
+        ]
+        last_error: ForgejoError | None = None
+        for payload in payloads:
+            try:
+                return self._request_json("POST", path, json=payload)
+            except ForgejoError as exc:
+                if "Forgejo API 400" in str(exc) or "Forgejo API 422" in str(exc):
+                    last_error = exc
+                    continue
+                raise
+        if last_error is not None:
+            raise last_error
+        raise ForgejoError(f"Failed to add dependency issue #{dependency_index} to issue #{index}.")
+
+    def list_issue_blocked_by(self, owner: str, repo: str, index: int) -> list[dict[str, Any]]:
+        issues, _supported = self._list_issue_relation(
+            owner=owner,
+            repo=repo,
+            index=index,
+            paths=(
+                f"/api/v1/repos/{owner}/{repo}/issues/{index}/dependencies",
+                f"/api/v1/repos/{owner}/{repo}/issues/{index}/blocked_by",
+                f"/api/v1/repos/{owner}/{repo}/issues/{index}/blockers",
+            ),
+            issue_fields=("dependencies", "blocked_by", "blockers"),
+        )
+        return issues
+
+    def list_issue_blocks(self, owner: str, repo: str, index: int) -> list[dict[str, Any]]:
+        issues, supported = self._list_issue_relation(
+            owner=owner,
+            repo=repo,
+            index=index,
+            paths=(
+                f"/api/v1/repos/{owner}/{repo}/issues/{index}/blocks",
+                f"/api/v1/repos/{owner}/{repo}/issues/{index}/blocking",
+            ),
+            issue_fields=("blocks", "blocking"),
+        )
+        if supported:
+            return issues
+
+        blocked: list[dict[str, Any]] = []
+        for issue in self.list_issues(owner, repo, state="all", limit=200):
+            issue_number = self._issue_number(issue)
+            if issue_number is None or issue_number == index:
+                continue
+            blockers = self.list_issue_blocked_by(owner, repo, issue_number)
+            blocker_numbers = {
+                blocker_number
+                for blocker_number in (self._issue_number(item) for item in blockers)
+                if blocker_number is not None
+            }
+            if index in blocker_numbers:
+                blocked.append(issue)
+        return blocked
+
     def update_pr(self, owner: str, repo: str, index: int, body: str) -> dict[str, Any]:
         payload = {"body": body}
         return self._request_json("PATCH", f"/api/v1/repos/{owner}/{repo}/pulls/{index}", json=payload)
@@ -300,3 +381,46 @@ class ForgejoClient:
                 raise
             data = self._request_json("GET", fallback)
         return list(data)
+
+    def _list_issue_relation(
+        self,
+        owner: str,
+        repo: str,
+        index: int,
+        paths: tuple[str, ...],
+        issue_fields: tuple[str, ...],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        for path in paths:
+            try:
+                data = self._request_json("GET", path)
+            except ForgejoError as exc:
+                if "Forgejo API 404" in str(exc):
+                    continue
+                raise
+            return self._coerce_issue_list(data), True
+
+        issue = self.get_issue(owner, repo, index)
+        for field in issue_fields:
+            raw = issue.get(field)
+            if isinstance(raw, list):
+                return list(raw), True
+        return [], False
+
+    def _coerce_issue_list(self, data: Any) -> list[dict[str, Any]]:
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        if isinstance(data, dict):
+            if isinstance(data.get("issues"), list):
+                return [item for item in data["issues"] if isinstance(item, dict)]
+            if isinstance(data.get("items"), list):
+                return [item for item in data["items"] if isinstance(item, dict)]
+            return [data]
+        return []
+
+    def _issue_number(self, issue: dict[str, Any]) -> int | None:
+        raw = issue.get("number", issue.get("index"))
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, str) and raw.isdigit():
+            return int(raw)
+        return None

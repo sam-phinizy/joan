@@ -24,6 +24,13 @@
 | `joan pr review request-changes [--body TEXT]` | Request changes on the current PR |
 | `joan pr review submit ...` | Post a review on a specific PR using an agent token |
 | `joan pr finish` | Merge the approved PR into the stage branch |
+| `joan issue create "TITLE" [--body TEXT]` | Create an issue |
+| `joan issue link <issue> <blocked-by-issue>` | Link issue dependencies |
+| `joan issue close <issue>` | Close an issue |
+| `joan issue read [--issue N] [--state ...] [--limit N]` | Read one or many issues |
+| `joan issue blocked-by <issue>` | List blockers for an issue |
+| `joan issue blocks <issue>` | List issues blocked by an issue |
+| `joan issue graph <issue> [--depth N]` | Return a JSON dependency graph around an issue |
 | `joan ship [--as BRANCH]` | Create or refresh the publish branch and push it upstream |
 
 ## Other Commands

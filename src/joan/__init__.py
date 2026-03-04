@@ -6,6 +6,7 @@ import typer
 
 from joan.cli.api import app as api_app
 from joan.cli.doctor import app as doctor_app
+from joan.cli.issue import app as issue_app
 from joan.cli.init import app as init_app
 from joan.cli.phil import app as phil_app
 from joan.cli.pr import app as pr_app
@@ -26,6 +27,7 @@ app = typer.Typer(
 app.add_typer(api_app, name="api")
 app.add_typer(init_app)
 app.add_typer(doctor_app, name="doctor")
+app.add_typer(issue_app, name="issue")
 app.add_typer(phil_app, name="phil")
 app.add_typer(remote_app, name="remote")
 app.add_typer(task_app, name="task")
