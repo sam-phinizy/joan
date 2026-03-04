@@ -31,6 +31,7 @@
 | `joan issue blocked-by <issue>` | List blockers for an issue |
 | `joan issue blocks <issue>` | List issues blocked by an issue |
 | `joan issue graph <issue> [--depth N]` | Return a JSON dependency graph around an issue |
+| `joan issue get-work [--limit N] [--ready-limit N]` | Return ready/blocked open-issue queue as JSON |
 | `joan ship [--as BRANCH]` | Create or refresh the publish branch and push it upstream |
 
 ## Other Commands

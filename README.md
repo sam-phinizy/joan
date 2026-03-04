@@ -76,6 +76,7 @@ uv run joan ship --as sam/redshift-query
 | `joan issue blocked-by <issue>` | List blockers for an issue as JSON |
 | `joan issue blocks <issue>` | List downstream blocked issues as JSON |
 | `joan issue graph <issue> [--depth N]` | Issue dependency graph as JSON |
+| `joan issue get-work [--limit N] [--ready-limit N]` | Ready/blocked work queue as JSON |
 | `joan ship [--as BRANCH]` | Prepare and push the final upstream publish branch |
 
 ## Skills
@@ -86,6 +87,7 @@ uv run joan ship --as sam/redshift-query
 - `joan-resolve-pr`: drive the PR state machine
 - `joan-pr-comment`: post or update PR comments
 - `joan-create-issue`: create/link/close/read issues and dependency graph JSON
+- `joan-get-work`: pick ready work from issue dependencies (Beads-like)
 - `phil-review`: trigger Phil’s on-demand AI review
 
 ## Notes

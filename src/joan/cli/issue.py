@@ -33,6 +33,10 @@ def _normalize_issues(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [_normalize_issue(issue) for issue in issues]
 
 
+def _sort_by_number(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(items, key=lambda item: (item.get("number") is None, item.get("number", 0)))
+
+
 def _valid_issue_state(state: str) -> str:
     normalized = state.strip().lower()
     if normalized not in {"open", "closed", "all"}:
@@ -167,5 +171,64 @@ def issue_graph(
             "depth": depth,
             "nodes": [_normalize_issue(nodes[number]) for number in sorted(nodes)],
             "edges": [{"from": src, "to": dst} for src, dst in sorted(edges)],
+        }
+    )
+
+
+@app.command("get-work", help="Return open issues grouped into ready vs blocked work as JSON.")
+def issue_get_work(
+    limit: int = typer.Option(200, "--limit", min=1, max=500, help="Maximum open issues to scan."),
+    ready_limit: int = typer.Option(25, "--ready-limit", min=1, max=500, help="Maximum ready issues to return."),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+
+    issues = client.list_issues(config.forgejo.owner, config.forgejo.repo, state="open", limit=limit)
+    issues = [issue for issue in issues if not issue.get("pull_request")]
+
+    ready: list[dict[str, Any]] = []
+    blocked: list[dict[str, Any]] = []
+
+    for issue in issues:
+        issue_number = _issue_number(issue)
+        if issue_number is None:
+            continue
+
+        blockers = client.list_issue_blocked_by(config.forgejo.owner, config.forgejo.repo, issue_number)
+        open_blockers = [
+            _normalize_issue(blocker)
+            for blocker in blockers
+            if str(blocker.get("state", "")).lower() != "closed"
+        ]
+        open_blockers = _sort_by_number(open_blockers)
+
+        item = {
+            "issue": _normalize_issue(issue),
+            "open_blockers": open_blockers,
+            "open_blocker_count": len(open_blockers),
+        }
+        if open_blockers:
+            blocked.append(item)
+        else:
+            ready.append(item)
+
+    ready_sorted = sorted(
+        ready,
+        key=lambda item: (item["issue"].get("number") is None, item["issue"].get("number", 0)),
+    )
+    blocked_sorted = sorted(
+        blocked,
+        key=lambda item: (item["issue"].get("number") is None, item["issue"].get("number", 0)),
+    )
+
+    print_json(
+        {
+            "summary": {
+                "open_issue_count": len(issues),
+                "ready_count": len(ready_sorted),
+                "blocked_count": len(blocked_sorted),
+            },
+            "ready": ready_sorted[:ready_limit],
+            "blocked": blocked_sorted,
         }
     )

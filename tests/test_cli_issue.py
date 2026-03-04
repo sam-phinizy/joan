@@ -139,3 +139,47 @@ def test_issue_relations_and_graph_json(monkeypatch) -> None:
     graph_payload = json.loads(graph_result.output)
     assert graph_payload["root_issue"] == 7
     assert sorted((edge["from"], edge["to"]) for edge in graph_payload["edges"]) == [(3, 7), (7, 9)]
+
+
+def test_issue_get_work_groups_ready_and_blocked(monkeypatch) -> None:
+    runner = CliRunner()
+    config = make_config()
+
+    class FakeClient:
+        def list_issues(self, owner, repo, state="open", limit=50):
+            assert (owner, repo, state, limit) == ("sam", "joan", "open", 50)
+            return [
+                {"number": 1, "title": "Ready one", "state": "open"},
+                {"number": 2, "title": "Blocked one", "state": "open"},
+                {"number": 3, "title": "Closed blocker", "state": "open"},
+                {"number": 4, "title": "PR style", "state": "open", "pull_request": {"number": 4}},
+            ]
+
+        def list_issue_blocked_by(self, owner, repo, index):
+            assert owner == "sam"
+            assert repo == "joan"
+            if index == 1:
+                return []
+            if index == 2:
+                return [{"number": 9, "title": "Blocker", "state": "open"}]
+            if index == 3:
+                return [{"number": 10, "title": "Done blocker", "state": "closed"}]
+            raise AssertionError(index)
+
+    monkeypatch.setattr(issue_mod, "load_config_or_exit", lambda: config)
+    monkeypatch.setattr(issue_mod, "forgejo_client", lambda _cfg: FakeClient())
+
+    result = runner.invoke(issue_mod.app, ["get-work", "--limit", "50", "--ready-limit", "1"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+
+    assert payload["summary"] == {
+        "open_issue_count": 3,
+        "ready_count": 2,
+        "blocked_count": 1,
+    }
+    assert len(payload["ready"]) == 1
+    assert payload["ready"][0]["issue"]["number"] == 1
+    assert payload["blocked"][0]["issue"]["number"] == 2
+    assert payload["blocked"][0]["open_blockers"][0]["number"] == 9
