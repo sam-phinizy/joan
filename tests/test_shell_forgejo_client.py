@@ -506,7 +506,7 @@ def test_add_issue_dependency_retries_payload_shapes(monkeypatch) -> None:
 
     def fake_request_json(self, method, path, **kwargs):
         calls.append(kwargs.get("json", {}))
-        if len(calls) == 1:
+        if len(calls) <= 3:
             raise ForgejoError("Forgejo API 422: invalid payload")
         return {"ok": True}
 
@@ -516,8 +516,31 @@ def test_add_issue_dependency_retries_payload_shapes(monkeypatch) -> None:
     result = client.add_issue_dependency("sam", "joan", 10, 4)
 
     assert result == {"ok": True}
-    assert calls[0] == {"index": 4}
-    assert calls[1] == {"owner": "sam", "repo": "joan", "index": 4}
+    assert calls[0] == {"owner": "sam", "repo": "joan", "index": 4}
+    assert calls[1] == {"index": 4}
+    assert calls[2] == {"dependent_issue_id": 4}
+    assert calls[3] == {"issue_index": 4}
+
+
+def test_add_issue_dependency_retries_on_404_then_succeeds(monkeypatch) -> None:
+    calls: list[dict] = []
+
+    def fake_request_json(self, method, path, **kwargs):
+        calls.append(kwargs.get("json", {}))
+        if len(calls) == 1:
+            raise ForgejoError(
+                'Forgejo API 404: {"message":"IsErrRepoNotExist","errors":["repository does not exist [id: 0, uid: 0, owner_name: , name: ]"]}'
+            )
+        return {"ok": True}
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+
+    result = client.add_issue_dependency("sam", "joan", 10, 4)
+
+    assert result == {"ok": True}
+    assert calls[0] == {"owner": "sam", "repo": "joan", "index": 4}
+    assert calls[1] == {"index": 4}
 
 
 def test_list_issue_blocked_by_uses_dependencies_endpoint(monkeypatch) -> None:

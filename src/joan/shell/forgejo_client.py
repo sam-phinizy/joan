@@ -222,9 +222,12 @@ class ForgejoClient:
     def add_issue_dependency(self, owner: str, repo: str, index: int, dependency_index: int) -> dict[str, Any]:
         path = f"/api/v1/repos/{owner}/{repo}/issues/{index}/dependencies"
         payloads = [
-            {"index": dependency_index},
+            # Forgejo swagger contract: body is IssueMeta {owner, repo, index}
             {"owner": owner, "repo": repo, "index": dependency_index},
+            {"index": dependency_index},
+            {"dependent_issue_id": dependency_index},
             {"issue_index": dependency_index},
+            {"owner": owner, "repo": repo, "dependent_issue_id": dependency_index},
             {"owner": owner, "repo": repo, "issue_index": dependency_index},
         ]
         last_error: ForgejoError | None = None
@@ -232,7 +235,11 @@ class ForgejoClient:
             try:
                 return self._request_json("POST", path, json=payload)
             except ForgejoError as exc:
-                if "Forgejo API 400" in str(exc) or "Forgejo API 422" in str(exc):
+                if (
+                    "Forgejo API 400" in str(exc)
+                    or "Forgejo API 404" in str(exc)
+                    or "Forgejo API 422" in str(exc)
+                ):
                     last_error = exc
                     continue
                 raise
