@@ -4,6 +4,7 @@ import importlib.metadata
 
 import typer
 
+from joan.cli.api import app as api_app
 from joan.cli.doctor import app as doctor_app
 from joan.cli.init import app as init_app
 from joan.cli.phil import app as phil_app
@@ -22,6 +23,7 @@ app = typer.Typer(
         "Start a task branch, review it incrementally into a Joan stage branch, and ship reviewed work upstream."
     )
 )
+app.add_typer(api_app, name="api")
 app.add_typer(init_app)
 app.add_typer(doctor_app, name="doctor")
 app.add_typer(phil_app, name="phil")
