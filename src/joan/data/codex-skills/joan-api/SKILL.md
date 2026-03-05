@@ -15,7 +15,8 @@ instance. Authentication and owner/repo substitution are handled automatically.
 ## Usage
 
 ```
-uv run joan api <METHOD> <PATH> [--data JSON] [--query key=value ...]
+joan api <METHOD> <PATH> [--data JSON] [--query key=value ...]
+joan api swagger [SWAGGER_PATH]
 ```
 
 ### Arguments
@@ -42,42 +43,52 @@ uv run joan api <METHOD> <PATH> [--data JSON] [--query key=value ...]
 
 ### List open pull requests
 ```bash
-uv run joan api GET /api/v1/repos/{owner}/{repo}/pulls
+joan api GET /api/v1/repos/{owner}/{repo}/pulls
 ```
 
 ### List closed PRs
 ```bash
-uv run joan api GET /api/v1/repos/{owner}/{repo}/pulls -q state=closed
+joan api GET /api/v1/repos/{owner}/{repo}/pulls -q state=closed
 ```
 
 ### Get a specific PR
 ```bash
-uv run joan api GET /api/v1/repos/{owner}/{repo}/pulls/5
+joan api GET /api/v1/repos/{owner}/{repo}/pulls/5
 ```
 
 ### Create an issue
 ```bash
-uv run joan api POST /api/v1/repos/{owner}/{repo}/issues -d '{"title": "Bug report", "body": "Details here"}'
+joan api POST /api/v1/repos/{owner}/{repo}/issues -d '{"title": "Bug report", "body": "Details here"}'
 ```
 
 ### List repo labels
 ```bash
-uv run joan api GET /api/v1/repos/{owner}/{repo}/labels
+joan api GET /api/v1/repos/{owner}/{repo}/labels
 ```
 
 ### Get current authenticated user
 ```bash
-uv run joan api GET /api/v1/user
+joan api GET /api/v1/user
 ```
 
 ### List all repos
 ```bash
-uv run joan api GET /api/v1/repos/search -q limit=50
+joan api GET /api/v1/repos/search -q limit=50
 ```
 
 ### Add a label to an issue
 ```bash
-uv run joan api POST /api/v1/repos/{owner}/{repo}/issues/1/labels -d '{"labels": [1]}'
+joan api POST /api/v1/repos/{owner}/{repo}/issues/1/labels -d '{"labels": [1]}'
+```
+
+### Fetch Swagger/OpenAPI JSON for agent planning
+```bash
+joan api swagger
+```
+
+### Fetch Swagger/OpenAPI JSON from a custom path
+```bash
+joan api swagger /swagger.v1.json
 ```
 
 ## Forgejo API Reference

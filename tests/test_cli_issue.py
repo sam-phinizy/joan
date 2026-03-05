@@ -43,6 +43,74 @@ def test_issue_create_calls_client(monkeypatch) -> None:
     }
 
 
+def test_issue_comment_calls_client(monkeypatch) -> None:
+    runner = CliRunner()
+    config = make_config()
+    captured: dict = {}
+
+    class FakeClient:
+        def create_issue_comment(self, owner, repo, index, body):
+            captured["owner"] = owner
+            captured["repo"] = repo
+            captured["index"] = index
+            captured["body"] = body
+            return {"id": 77}
+
+    monkeypatch.setattr(issue_mod, "load_config_or_exit", lambda: config)
+    monkeypatch.setattr(issue_mod, "forgejo_client", lambda _cfg: FakeClient())
+
+    result = runner.invoke(issue_mod.app, ["comment", "12", "--body", "Looks good."])
+
+    assert result.exit_code == 0, result.output
+    assert "Posted comment on issue #12" in result.output
+    assert captured == {
+        "owner": "sam",
+        "repo": "joan",
+        "index": 12,
+        "body": "Looks good.",
+    }
+
+
+def test_issue_comments_reads_all_comments(monkeypatch) -> None:
+    runner = CliRunner()
+    config = make_config()
+
+    class FakeClient:
+        def list_issue_comments(self, owner, repo, index):
+            assert (owner, repo, index) == ("sam", "joan", 12)
+            return [
+                {
+                    "id": 1,
+                    "body": "first",
+                    "html_url": "http://forgejo.local/sam/joan/issues/12#issuecomment-1",
+                    "created_at": "2026-03-05T14:00:00Z",
+                    "updated_at": "2026-03-05T14:00:00Z",
+                    "user": {"login": "sam"},
+                },
+                {
+                    "id": 2,
+                    "body": "second",
+                    "html_url": "http://forgejo.local/sam/joan/issues/12#issuecomment-2",
+                    "created_at": "2026-03-05T14:05:00Z",
+                    "updated_at": "2026-03-05T14:05:00Z",
+                    "user": {"login": "pat"},
+                },
+            ]
+
+    monkeypatch.setattr(issue_mod, "load_config_or_exit", lambda: config)
+    monkeypatch.setattr(issue_mod, "forgejo_client", lambda _cfg: FakeClient())
+
+    result = runner.invoke(issue_mod.app, ["comments", "12"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert len(payload) == 2
+    assert payload[0]["id"] == 1
+    assert payload[0]["author"] == "sam"
+    assert payload[1]["id"] == 2
+    assert payload[1]["author"] == "pat"
+
+
 def test_issue_link_rejects_self_reference() -> None:
     runner = CliRunner()
 
@@ -69,7 +137,13 @@ def test_issue_read_list_and_single(monkeypatch) -> None:
 
         def get_issue(self, owner, repo, index):
             assert (owner, repo, index) == ("sam", "joan", 5)
-            return {"number": 5, "title": "Five", "state": "open", "html_url": "http://forgejo.local/5"}
+            return {
+                "number": 5,
+                "title": "Five",
+                "body": "Issue details",
+                "state": "open",
+                "html_url": "http://forgejo.local/5",
+            }
 
     monkeypatch.setattr(issue_mod, "load_config_or_exit", lambda: config)
     monkeypatch.setattr(issue_mod, "forgejo_client", lambda _cfg: FakeClient())
@@ -83,6 +157,7 @@ def test_issue_read_list_and_single(monkeypatch) -> None:
     assert one_result.exit_code == 0, one_result.output
     one_payload = json.loads(one_result.output)
     assert one_payload["number"] == 5
+    assert one_payload["body"] == "Issue details"
 
 
 def test_issue_relations_and_graph_json(monkeypatch) -> None:

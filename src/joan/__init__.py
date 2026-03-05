@@ -4,7 +4,7 @@ import importlib.metadata
 
 import typer
 
-from joan.cli.api import app as api_app
+from joan.cli.api import api_command
 from joan.cli.doctor import app as doctor_app
 from joan.cli.issue import app as issue_app
 from joan.cli.init import app as init_app
@@ -24,7 +24,7 @@ app = typer.Typer(
         "Start a task branch, review it incrementally into a Joan stage branch, and ship reviewed work upstream."
     )
 )
-app.add_typer(api_app, name="api")
+app.command("api", help="Send raw API requests or fetch Swagger/OpenAPI JSON.")(api_command)
 app.add_typer(init_app)
 app.add_typer(doctor_app, name="doctor")
 app.add_typer(issue_app, name="issue")

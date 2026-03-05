@@ -18,7 +18,7 @@ Forgejo review remote.
 - Working branch: `feature/cache`
 - Stage branch: `joan-stage/feature/cache`
 - Review PR: `feature/cache -> joan-stage/feature/cache`
-- Final publish step: `uv run joan ship`
+- Final publish step: `joan ship`
 
 ## Workflow
 
@@ -30,38 +30,38 @@ Forgejo review remote.
    If the user is on `main`, start or switch to a task with `/joan:joan-task`.
 3. Check whether there is already an open PR:
    ```bash
-   uv run joan pr sync
+   joan pr sync
    ```
    - If there is no PR, open one:
      ```bash
-     uv run joan pr create --title "Short description of changes"
+     joan pr create --title "Short description of changes"
      ```
    - If a PR exists, invoke `/joan:joan-resolve-pr`.
 4. Once the PR is approved and comments are resolved:
    ```bash
-   uv run joan pr finish
+   joan pr finish
    ```
    This merges the PR into `joan-stage/<working-branch>`.
 5. When the staged work is ready for the final GitHub PR:
    ```bash
-   uv run joan ship
+   joan ship
    ```
 
 ## Rules
 
-1. Always use `uv run joan`.
-2. Do not push to the upstream remote directly; use `uv run joan ship`.
-3. Resolve comments one at a time and re-push with `uv run joan task push`.
+1. Always use `joan`.
+2. Do not push to the upstream remote directly; use `joan ship`.
+3. Resolve comments one at a time and re-push with `joan task push`.
 4. `joan-resolve-pr` owns the detailed “what to do with this PR state?” logic.
 
 ## Quick Reference
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `uv run joan pr create --title "..." --body "..."` | Open a Forgejo PR from the task branch to its stage branch | `PR #N: {url}` |
-| `uv run joan pr sync` | Check approval and comment state | JSON: `{approved, unresolved_comments, latest_review_state}` |
-| `uv run joan pr comments` | List unresolved PR comments | JSON array of comment objects |
-| `uv run joan pr reviews` | List review submissions | JSON array: `[{id, state, body, author, submitted_at}]` |
-| `uv run joan task push` | Push the task branch for another review round | `Pushed task branch: {branch}` |
-| `uv run joan pr finish` | Merge the approved PR into the stage branch | `Merged PR #N into joan-stage/{branch}` |
-| `uv run joan ship` | Create or refresh the upstream publish branch | `Prepared publish branch ...` |
+| `joan pr create --title "..." --body "..."` | Open a Forgejo PR from the task branch to its stage branch | `PR #N: {url}` |
+| `joan pr sync` | Check approval and comment state | JSON: `{approved, unresolved_comments, latest_review_state}` |
+| `joan pr comments` | List unresolved PR comments | JSON array of comment objects |
+| `joan pr reviews` | List review submissions | JSON array: `[{id, state, body, author, submitted_at}]` |
+| `joan task push` | Push the task branch for another review round | `Pushed task branch: {branch}` |
+| `joan pr finish` | Merge the approved PR into the stage branch | `Merged PR #N into joan-stage/{branch}` |
+| `joan ship` | Create or refresh the upstream publish branch | `Prepared publish branch ...` |

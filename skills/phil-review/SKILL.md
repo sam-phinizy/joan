@@ -17,12 +17,12 @@ the results directly to Forgejo as inline comments and a review verdict.
 1. **Config**: Verify `.joan/config.toml` exists. If not, tell the user to run
    `/joan:joan-setup` first.
 2. **Phil agent**: Verify `.joan/agents/phil.toml` exists. If not, tell the
-   user to run `uv run joan phil init` first.
+   user to run `joan phil init` first.
 
 ## Step 1 — Confirm an open PR exists
 
 ```bash
-uv run joan pr sync
+joan pr sync
 ```
 
 If this fails with "No open PR found", stop and tell the user they need an
@@ -98,7 +98,7 @@ Write a short overall summary (1-3 sentences) in Phil's voice.
 For **each** inline comment, run:
 
 ```bash
-uv run joan pr comment add \
+joan pr comment add \
   --agent phil \
   --owner <owner> \
   --repo <repo> \
@@ -113,7 +113,7 @@ Post comments one at a time. Do not batch them.
 ## Step 6 — Post the final review verdict
 
 ```bash
-uv run joan pr review submit \
+joan pr review submit \
   --agent phil \
   --owner <owner> \
   --repo <repo> \
@@ -130,11 +130,11 @@ Tell the user:
 - A brief summary of Phil's findings
 
 If Phil approved the PR, let the user know they can proceed with
-`uv run joan pr finish`.
+`joan pr finish`.
 
 ## Rules
 
-1. **Always use `uv run joan`**, not bare `joan`.
+1. **Always use `joan`**, not bare `joan`.
 2. **Post as Phil.** All comments and the review use `--agent phil` so they
    appear from Phil's Forgejo account.
 3. **Be honest.** If the code is clean, approve it. Do not manufacture issues.

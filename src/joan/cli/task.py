@@ -143,6 +143,14 @@ def task_track(
     _ensure_stage_missing(config.remotes.review, target_branch)
 
     start_ref, start_sha = _resolve_start_ref(from_ref, config.remotes.upstream)
+    branch_tip = run_git(rev_parse_args(target_branch))
+    if start_sha == branch_tip:
+        typer.echo(
+            "Selected --from resolves to the current branch tip, which would create an empty-diff PR. "
+            "Choose a base ref behind your branch (for example, origin/main).",
+            err=True,
+        )
+        raise typer.Exit(code=2)
 
     run_git(push_refspec_args(config.remotes.review, start_sha, f"refs/heads/{stage_branch_name(target_branch)}"))
     run_git(push_branch_args(config.remotes.review, target_branch, set_upstream=True))

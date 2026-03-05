@@ -69,7 +69,11 @@ uv run joan ship --as sam/redshift-query
 | `joan pr comments` | Show PR comments as JSON |
 | `joan pr reviews` | Show review submissions as JSON |
 | `joan pr finish` | Merge the approved PR into the stage branch |
+| `joan api <METHOD> <PATH> [-d JSON] [-q key=value]` | Send a raw API request |
+| `joan api swagger [--path /custom/swagger.json]` | Print Swagger/OpenAPI JSON for agent consumption |
 | `joan issue create "TITLE" [--body TEXT]` | Create an issue |
+| `joan issue comment <issue> --body "..."` | Post a comment on an issue |
+| `joan issue comments <issue>` | Read all comments on an issue as JSON |
 | `joan issue link <issue> <blocked-by-issue>` | Link issue dependencies |
 | `joan issue close <issue>` | Close an issue |
 | `joan issue read [--issue N] [--state ...] [--limit N]` | Read one or many issues as JSON |

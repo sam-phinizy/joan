@@ -17,7 +17,7 @@ Unified interface for all PR comment and description update operations.
    `/joan:joan-setup` first.
 2. Confirm an open PR exists for the current branch:
    ```
-   uv run joan pr sync
+   joan pr sync
    ```
    If this fails with "No open PR found", stop and tell the user.
 
@@ -36,7 +36,7 @@ the intent is passed in context. Proceed directly to the appropriate action.
 ## Action: Post a General Comment
 
 ```bash
-uv run joan pr comment post --body "<comment text>"
+joan pr comment post --body "<comment text>"
 ```
 
 Use this when the intent is to leave a discussion comment visible to the
@@ -56,10 +56,10 @@ Changes made:
 ## Action: Post an Inline Comment
 
 Read `.joan/config.toml` to get `owner`, `repo`, and the agent name. Get
-the PR number from `uv run joan pr sync`. Then:
+the PR number from `joan pr sync`. Then:
 
 ```bash
-uv run joan pr comment add \
+joan pr comment add \
   --agent <agent-name> \
   --owner <owner> \
   --repo <repo> \
@@ -109,7 +109,7 @@ from `.joan/config.toml` if available, otherwise leave as "agent".
 Then apply:
 
 ```bash
-uv run joan pr update --body "<full new body>"
+joan pr update --body "<full new body>"
 ```
 
 ---

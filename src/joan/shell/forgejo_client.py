@@ -202,6 +202,10 @@ class ForgejoClient:
         payload = {"body": body}
         return self._request_json("POST", f"/api/v1/repos/{owner}/{repo}/issues/{index}/comments", json=payload)
 
+    def list_issue_comments(self, owner: str, repo: str, index: int) -> list[dict[str, Any]]:
+        data = self._request_json("GET", f"/api/v1/repos/{owner}/{repo}/issues/{index}/comments")
+        return list(data)
+
     def create_issue(self, owner: str, repo: str, title: str, body: str | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {"title": title}
         if body:

@@ -7,7 +7,7 @@ import typer
 
 from joan.cli._common import forgejo_client, load_config_or_exit, print_json
 
-app = typer.Typer(help="Create, link, read, close, and graph Forgejo issues.")
+app = typer.Typer(help="Create, comment, read comments, link, read, close, and graph Forgejo issues.")
 
 
 def _issue_number(issue: dict[str, Any]) -> int | None:
@@ -23,6 +23,7 @@ def _normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
     return {
         "number": _issue_number(issue),
         "title": str(issue.get("title", "")),
+        "body": str(issue.get("body", "")),
         "state": str(issue.get("state", "")),
         "url": str(issue.get("html_url") or issue.get("url") or ""),
         "is_pull_request": bool(issue.get("pull_request")),
@@ -31,6 +32,21 @@ def _normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_issues(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [_normalize_issue(issue) for issue in issues]
+
+
+def _normalize_comment(comment: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": comment.get("id"),
+        "body": str(comment.get("body", "")),
+        "author": str(comment.get("user", {}).get("login", "")),
+        "url": str(comment.get("html_url") or comment.get("url") or ""),
+        "created_at": str(comment.get("created_at", "")),
+        "updated_at": str(comment.get("updated_at", "")),
+    }
+
+
+def _normalize_comments(comments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [_normalize_comment(comment) for comment in comments]
 
 
 def _sort_by_number(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -82,6 +98,27 @@ def issue_close(
     client = forgejo_client(config)
     client.close_issue(config.forgejo.owner, config.forgejo.repo, issue)
     typer.echo(f"Closed issue #{issue}")
+
+
+@app.command("comment", help="Post a comment on an issue by number.")
+def issue_comment(
+    issue: int = typer.Argument(..., help="Issue number to comment on."),
+    body: str = typer.Option(..., "--body", help="Comment text to post."),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    client.create_issue_comment(config.forgejo.owner, config.forgejo.repo, issue, body)
+    typer.echo(f"Posted comment on issue #{issue}")
+
+
+@app.command("comments", help="Read all comments for an issue by number as JSON.")
+def issue_comments(
+    issue: int = typer.Argument(..., help="Issue number to read comments for."),
+) -> None:
+    config = load_config_or_exit()
+    client = forgejo_client(config)
+    comments = client.list_issue_comments(config.forgejo.owner, config.forgejo.repo, issue)
+    print_json(_normalize_comments(comments))
 
 
 @app.command("read", help="Read one issue or list issues.")

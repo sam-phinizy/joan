@@ -16,14 +16,14 @@ the Forgejo review remote.
 - Working branch: where code changes happen
 - Stage branch: `joan-stage/<working-branch>` on the review remote
 - Review PR: `working-branch -> joan-stage/<working-branch>`
-- Final publish step: `uv run joan ship`
+- Final publish step: `joan ship`
 
 ## Start New Work
 
 Use this when the user is starting a fresh task:
 
 ```bash
-uv run joan task start <branch-name> --from origin/main
+joan task start <branch-name> --from origin/main
 ```
 
 This:
@@ -36,7 +36,7 @@ This:
 Use this when the branch already exists locally and needs to enter Joan:
 
 ```bash
-uv run joan task track --from origin/main
+joan task track --from origin/main
 ```
 
 Use `--branch <name>` when the target branch is not checked out.
@@ -44,7 +44,7 @@ Use `--branch <name>` when the target branch is not checked out.
 ## Inspect Status
 
 ```bash
-uv run joan task status
+joan task status
 ```
 
 This prints JSON with:
@@ -56,7 +56,7 @@ This prints JSON with:
 ## Push Another Review Round
 
 ```bash
-uv run joan task push
+joan task push
 ```
 
 Use this after new commits are ready for another pass on the same PR.
@@ -67,4 +67,4 @@ Once the user has reviewable code:
 - use `/joan:joan-review` to open or manage the Forgejo PR
 
 When the staged work is ready for the final GitHub PR:
-- run `uv run joan ship`
+- run `joan ship`

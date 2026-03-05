@@ -457,6 +457,25 @@ def test_create_issue_comment_posts_to_issues_endpoint(monkeypatch) -> None:
     assert result == {"id": 42}
 
 
+def test_list_issue_comments_gets_issue_comments_endpoint(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_request_json(self, method, path, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["kwargs"] = kwargs
+        return [{"id": 1}, {"id": 2}]
+
+    monkeypatch.setattr(ForgejoClient, "_request_json", fake_request_json)
+    client = ForgejoClient("http://forgejo.local", "tok")
+    result = client.list_issue_comments("sam", "joan", 7)
+
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/api/v1/repos/sam/joan/issues/7/comments"
+    assert captured["kwargs"] == {}
+    assert result == [{"id": 1}, {"id": 2}]
+
+
 def test_create_get_list_and_close_issue_endpoints(monkeypatch) -> None:
     calls: list[tuple[str, str, dict]] = []
 

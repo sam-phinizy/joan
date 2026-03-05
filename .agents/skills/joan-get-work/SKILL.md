@@ -19,7 +19,7 @@ Use this skill to select actionable issues quickly.
 ## Primary Command
 
 ```bash
-uv run joan issue get-work --limit 200 --ready-limit 25
+joan issue get-work --limit 200 --ready-limit 25
 ```
 
 Returns JSON:
@@ -33,6 +33,6 @@ Returns JSON:
 2. If `ready` is non-empty, pick the first issue unless the user provides a different prioritization rule.
 3. If `ready` is empty:
    - report blocked items and their blockers
-   - run `uv run joan issue graph <issue> --depth 1` for the top blocked issue when dependency context helps
+   - run `joan issue graph <issue> --depth 1` for the top blocked issue when dependency context helps
 4. Before creating a new issue, check existing work:
-   - `uv run joan issue read --state open --limit 100`
+   - `joan issue read --state open --limit 100`

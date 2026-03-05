@@ -27,7 +27,7 @@ then act based on what the sync tells you.
 ## Step 1: Sync PR state
 
 ```
-uv run joan pr sync
+joan pr sync
 ```
 
 JSON output:
@@ -57,7 +57,7 @@ Use when `unresolved_comments > 0`.
 ### 1. Fetch unresolved comments
 
 ```
-uv run joan pr comments
+joan pr comments
 ```
 
 If the list is empty despite the count being non-zero, re-sync and re-check.
@@ -77,7 +77,7 @@ For each comment:
 4. Show a concise summary of what changed.
 5. Resolve:
    ```
-   uv run joan pr comment resolve <id>
+   joan pr comment resolve <id>
    ```
    **If this fails with an API error (e.g. 405):** the comment is a PR-level
    discussion comment that cannot be resolved via the API. Tell the user which
@@ -103,7 +103,7 @@ After addressing all comments:
 ```bash
 git add <changed-files>
 git commit -m "Address review feedback"
-uv run joan task push
+joan task push
 ```
 
 ### 5. Update PR and notify reviewer
@@ -122,7 +122,7 @@ Invoke `joan-pr-comment` to:
 ### 6. Re-sync
 
 ```
-uv run joan pr sync
+joan pr sync
 ```
 
 If `unresolved_comments` is still non-zero, repeat from step 1.
@@ -140,7 +140,7 @@ comments are already resolved). The instructions are in the review body.
 ### 1. Fetch review submissions
 
 ```
-uv run joan pr reviews
+joan pr reviews
 ```
 
 JSON output (array):
@@ -180,7 +180,7 @@ Stop and ask the user if:
 ```bash
 git add <changed-files>
 git commit -m "Implement reviewer-requested changes"
-uv run joan task push
+joan task push
 ```
 
 ### 5. Update PR and notify reviewer
@@ -199,7 +199,7 @@ Invoke `joan-pr-comment` to:
 ### 6. Re-sync
 
 ```
-uv run joan pr sync
+joan pr sync
 ```
 
 Tell the user the PR is ready for re-review.
@@ -211,7 +211,7 @@ Tell the user the PR is ready for re-review.
 Use when `approved = true`.
 
 ```
-uv run joan pr finish
+joan pr finish
 ```
 
 On success:
@@ -224,7 +224,7 @@ The PR is merged on Forgejo into the task's stage branch.
 Only if the user explicitly wants to publish upstream later, switch to the base
 branch and run:
 ```bash
-uv run joan ship
+joan ship
 ```
 
 ---
@@ -233,12 +233,12 @@ uv run joan ship
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `uv run joan pr sync` | Check approval and comment state | JSON: `{approved, unresolved_comments, latest_review_state}` |
-| `uv run joan pr comments` | List unresolved PR-level and inline comments | JSON array of comment objects |
-| `uv run joan pr reviews` | List review submissions with body text | JSON array: `[{id, state, body, author, submitted_at}]` |
-| `uv run joan pr comment resolve <id>` | Mark a comment resolved | `Resolved comment <id>` |
-| `uv run joan task push` | Push current task branch for re-review | `Pushed task branch: {branch}` |
-| `uv run joan pr finish` | Merge PR on Forgejo into the stage branch | `Merged PR #N into joan-stage/{branch}` |
-| `uv run joan ship` | Push a clean publish branch upstream | `Prepared publish branch ...` |
-| `uv run joan pr comment post --body "..."` | Post a general discussion comment on the PR | `Posted comment on PR #N` |
-| `uv run joan pr update --body "..."` | Update the PR description | `Updated PR #N description` |
+| `joan pr sync` | Check approval and comment state | JSON: `{approved, unresolved_comments, latest_review_state}` |
+| `joan pr comments` | List unresolved PR-level and inline comments | JSON array of comment objects |
+| `joan pr reviews` | List review submissions with body text | JSON array: `[{id, state, body, author, submitted_at}]` |
+| `joan pr comment resolve <id>` | Mark a comment resolved | `Resolved comment <id>` |
+| `joan task push` | Push current task branch for re-review | `Pushed task branch: {branch}` |
+| `joan pr finish` | Merge PR on Forgejo into the stage branch | `Merged PR #N into joan-stage/{branch}` |
+| `joan ship` | Push a clean publish branch upstream | `Prepared publish branch ...` |
+| `joan pr comment post --body "..."` | Post a general discussion comment on the PR | `Posted comment on PR #N` |
+| `joan pr update --body "..."` | Update the PR description | `Updated PR #N description` |

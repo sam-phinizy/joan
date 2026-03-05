@@ -1,4 +1,4 @@
-from joan.cli.api import app as api_app
+from joan.cli.api import api_command
 from joan.cli.doctor import app as doctor_app
 from joan.cli.issue import app as issue_app
 from joan.cli.init import app as init_app
@@ -12,7 +12,7 @@ from joan.cli.task import app as task_app
 from joan.cli.worktree import app as worktree_app
 
 __all__ = [
-    "api_app",
+    "api_command",
     "doctor_app",
     "issue_app",
     "init_app",
