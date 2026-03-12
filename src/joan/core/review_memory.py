@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from joan.core.models import Comment, Review
+from joan.shell.repo_state import repo_state_dir, repo_state_write_lock
 
 
 _RULE_CATALOG: list[tuple[str, str, str, float]] = [
@@ -22,7 +23,7 @@ _RULE_CATALOG: list[tuple[str, str, str, float]] = [
 
 
 def _store_path(cwd: Path) -> Path:
-    return cwd / ".joan" / "review-memory" / "rules.json"
+    return repo_state_dir(cwd) / "review-memory" / "rules.json"
 
 
 def load_store(cwd: Path) -> dict[str, Any]:
@@ -41,9 +42,10 @@ def load_store(cwd: Path) -> dict[str, Any]:
 
 
 def save_store(cwd: Path, data: dict[str, Any]) -> Path:
-    path = _store_path(cwd)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    path = repo_state_dir(cwd, for_write=True) / "review-memory" / "rules.json"
+    with repo_state_write_lock(cwd):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
 
 

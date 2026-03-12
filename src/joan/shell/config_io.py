@@ -14,15 +14,19 @@ from joan.core.config import (
     repo_config_to_dict,
 )
 from joan.core.models import Config, GlobalConfig, RepoConfig
+from joan.shell.repo_state import repo_state_candidates, repo_state_dir, repo_state_write_lock
 
 
 def global_config_path() -> Path:
     return Path.home() / ".joan" / "config.toml"
 
 
-def config_path(repo_root: Path | None = None) -> Path:
-    root = repo_root or Path.cwd()
-    return root / ".joan" / "config.toml"
+def config_path(repo_root: Path | None = None, *, for_write: bool = False) -> Path:
+    return repo_state_dir(repo_root, for_write=for_write) / "config.toml"
+
+
+def _config_candidates(repo_root: Path | None = None) -> list[Path]:
+    return [state_dir / "config.toml" for state_dir in repo_state_candidates(repo_root)]
 
 
 def read_global_config() -> GlobalConfig | None:
@@ -41,18 +45,22 @@ def write_global_config(cfg: GlobalConfig) -> Path:
 
 
 def write_repo_config(cfg: RepoConfig, repo_root: Path | None = None) -> Path:
-    path = config_path(repo_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(tomli_w.dumps(repo_config_to_dict(cfg)), encoding="utf-8")
+    path = config_path(repo_root, for_write=True)
+    with repo_state_write_lock(repo_root):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(tomli_w.dumps(repo_config_to_dict(cfg)), encoding="utf-8")
     return path
 
 
 def read_config(repo_root: Path | None = None) -> Config:
-    repo_path = config_path(repo_root)
+    candidate_paths = _config_candidates(repo_root)
+    repo_path = candidate_paths[0]
     global_cfg = read_global_config()
 
-    if repo_path.exists():
-        raw = repo_path.read_text(encoding="utf-8")
+    for path in candidate_paths:
+        if not path.exists():
+            continue
+        raw = path.read_text(encoding="utf-8")
         # Backward compat: if the per-repo TOML has url + token, it's an old-style full config
         import tomllib
         try:
@@ -80,8 +88,9 @@ def read_config(repo_root: Path | None = None) -> Config:
 
 
 def write_config(config: Config, repo_root: Path | None = None) -> Path:
-    path = config_path(repo_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data = config_to_dict(config)
-    path.write_text(tomli_w.dumps(data), encoding="utf-8")
+    path = config_path(repo_root, for_write=True)
+    with repo_state_write_lock(repo_root):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = config_to_dict(config)
+        path.write_text(tomli_w.dumps(data), encoding="utf-8")
     return path

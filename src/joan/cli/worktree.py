@@ -7,12 +7,13 @@ import typer
 
 from joan.core.git import infer_branch_name, worktree_add_args, worktree_remove_args
 from joan.shell.git_runner import run_git
+from joan.shell.repo_state import repo_state_dir, repo_state_write_lock
 
 app = typer.Typer(help="Create and remove local git worktrees for isolated agent runs.")
 
 
 def _tracking_file() -> Path:
-    return Path.cwd() / ".joan" / "worktrees.json"
+    return repo_state_dir(Path.cwd()) / "worktrees.json"
 
 
 def _load_tracking() -> dict[str, str]:
@@ -23,9 +24,10 @@ def _load_tracking() -> dict[str, str]:
 
 
 def _save_tracking(data: dict[str, str]) -> None:
-    path = _tracking_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    path = repo_state_dir(Path.cwd(), for_write=True) / "worktrees.json"
+    with repo_state_write_lock(Path.cwd()):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 @app.command("create", help="Create a new worktree on a new branch and record it in `.joan/worktrees.json`.")
