@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -54,6 +55,48 @@ def test_pr_create_uses_stage_branch(monkeypatch, sample_config) -> None:
         "title": "feature/cache",
         "head": "feature/cache",
         "base": "joan-stage/feature/cache",
+    }
+
+
+def test_pr_create_reads_body_file(monkeypatch, sample_config, tmp_path: Path) -> None:
+    runner = CliRunner()
+    calls: list[list[str]] = []
+    captured: dict[str, object] = {}
+    body_file = tmp_path / "body.md"
+    body_file.write_text("Narrative from file", encoding="utf-8")
+
+    class FakeClient:
+        def create_pr(self, _owner, _repo, payload):
+            captured["payload"] = payload
+            return {
+                "number": 4,
+                "title": "t",
+                "html_url": "http://forgejo.local/pr/4",
+                "state": "open",
+                "head": {"ref": "feature/cache"},
+                "base": {"ref": "joan-stage/feature/cache"},
+            }
+
+    monkeypatch.setattr(pr_mod, "load_config_or_exit", lambda: sample_config)
+    monkeypatch.setattr(pr_mod, "forgejo_client", lambda _cfg: FakeClient())
+    monkeypatch.setattr(pr_mod, "current_branch", lambda: "feature/cache")
+
+    def fake_run_git(args):
+        calls.append(args)
+        if args == ["ls-remote", "joan-review", "refs/heads/joan-stage/feature/cache"]:
+            return "abc"
+        return ""
+
+    monkeypatch.setattr(pr_mod, "run_git", fake_run_git)
+
+    result = runner.invoke(pr_mod.app, ["create", "--body-file", str(body_file)])
+    assert result.exit_code == 0, result.output
+    assert ["push", "-u", "joan-review", "feature/cache"] in calls
+    assert captured["payload"] == {
+        "title": "feature/cache",
+        "head": "feature/cache",
+        "base": "joan-stage/feature/cache",
+        "body": "Narrative from file",
     }
 
 

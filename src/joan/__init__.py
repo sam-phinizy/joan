@@ -10,6 +10,7 @@ from joan.cli.issue import app as issue_app
 from joan.cli.init import app as init_app
 from joan.cli.phil import app as phil_app
 from joan.cli.pr import app as pr_app
+from joan.cli.review_memory import app as review_memory_app
 from joan.cli.remote import app as remote_app
 from joan.cli.services import app as services_app
 from joan.cli.ship import ship_command
@@ -32,6 +33,7 @@ app.add_typer(phil_app, name="phil")
 app.add_typer(remote_app, name="remote")
 app.add_typer(task_app, name="task")
 app.add_typer(pr_app, name="pr")
+app.add_typer(review_memory_app, name="review-memory")
 app.add_typer(ssh_app, name="ssh")
 app.add_typer(services_app, name="services")
 app.add_typer(skills_app, name="skills")

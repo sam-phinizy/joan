@@ -4,6 +4,7 @@ from joan.cli.issue import app as issue_app
 from joan.cli.init import app as init_app
 from joan.cli.phil import app as phil_app
 from joan.cli.pr import app as pr_app
+from joan.cli.review_memory import app as review_memory_app
 from joan.cli.remote import app as remote_app
 from joan.cli.services import app as services_app
 from joan.cli.ship import ship_command
@@ -18,6 +19,7 @@ __all__ = [
     "init_app",
     "phil_app",
     "pr_app",
+    "review_memory_app",
     "remote_app",
     "services_app",
     "ship_command",

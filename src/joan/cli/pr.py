@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import typer
 
@@ -22,13 +23,16 @@ from joan.core.forgejo import (
     parse_reviews,
 )
 from joan.core.git import is_stage_branch, ls_remote_ref_args, push_branch_args, stage_branch_name
+from joan.core.pr_narrative import build_narrative_markdown, collect_changes, collect_commits, load_tests
 from joan.shell.git_runner import run_git
 
 app = typer.Typer(help="Open Forgejo PRs, inspect review state, and merge approved work into Joan stage branches.")
 comment_app = typer.Typer(help="Read or resolve PR comments.")
 review_app = typer.Typer(help="Post review verdicts on PRs.")
+narrative_app = typer.Typer(help="Build deterministic PR body text from issue, commits, and tests.")
 app.add_typer(comment_app, name="comment")
 app.add_typer(review_app, name="review")
+app.add_typer(narrative_app, name="narrative")
 
 
 def _ensure_task_branch(branch: str) -> None:
@@ -52,6 +56,7 @@ def _ensure_stage_exists(remote: str, branch: str) -> str:
 def _create_pr(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
+    body_file: Path | None = typer.Option(None, "--body-file", help="Read PR body text from a file."),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
@@ -67,7 +72,12 @@ def _create_pr(
 
     run_git(push_branch_args(config.remotes.review, branch, set_upstream=True))
 
-    payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=body)
+    if body is not None and body_file is not None:
+        typer.echo("Pass either --body or --body-file, not both.", err=True)
+        raise typer.Exit(code=2)
+    resolved_body = body_file.read_text(encoding="utf-8") if body_file is not None else body
+
+    payload = build_create_pr_payload(title=title or branch, head=branch, base=resolved_base, body=resolved_body)
     pr_raw = client.create_pr(config.forgejo.owner, config.forgejo.repo, payload)
     pr = parse_pr_response(pr_raw)
     human_user = config.forgejo.human_user
@@ -80,6 +90,7 @@ def _create_pr(
 def pr_create(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
+    body_file: Path | None = typer.Option(None, "--body-file", help="Read PR body text from a file."),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
@@ -89,6 +100,7 @@ def pr_create(
     _create_pr(
         title=title,
         body=body,
+        body_file=body_file,
         request_human_review=request_human_review,
     )
 
@@ -97,6 +109,7 @@ def pr_create(
 def pr_open(
     title: str | None = typer.Option(default=None, help="PR title. Defaults to the current branch name."),
     body: str | None = typer.Option(default=None, help="Optional PR body/description."),
+    body_file: Path | None = typer.Option(None, "--body-file", help="Read PR body text from a file."),
     request_human_review: bool = typer.Option(
         True,
         "--request-human-review/--no-request-human-review",
@@ -106,6 +119,7 @@ def pr_open(
     _create_pr(
         title=title,
         body=body,
+        body_file=body_file,
         request_human_review=request_human_review,
     )
 
@@ -261,13 +275,59 @@ def pr_finish() -> None:
 
 @app.command("update", help="Update the description of the current branch's open PR.")
 def pr_update(
-    body: str = typer.Option(..., "--body", help="New PR description/body text."),
+    body: str | None = typer.Option(None, "--body", help="New PR description/body text."),
+    body_file: Path | None = typer.Option(None, "--body-file", help="Read PR description/body from a file."),
 ) -> None:
+    if body is not None and body_file is not None:
+        typer.echo("Pass either --body or --body-file, not both.", err=True)
+        raise typer.Exit(code=2)
+    if body is None and body_file is None:
+        typer.echo("Pass one of --body or --body-file.", err=True)
+        raise typer.Exit(code=2)
+
+    resolved_body = body_file.read_text(encoding="utf-8") if body_file is not None else body
+    if resolved_body is None:
+        typer.echo("Failed to resolve PR body text.", err=True)
+        raise typer.Exit(code=2)
+
     config = load_config_or_exit()
     client = forgejo_client(config)
     pr = current_pr_or_exit(config)
-    client.update_pr(config.forgejo.owner, config.forgejo.repo, pr.number, body)
+    client.update_pr(config.forgejo.owner, config.forgejo.repo, pr.number, resolved_body)
     typer.echo(f"Updated PR #{pr.number} description")
+
+
+@narrative_app.command("build", help="Generate PR narrative markdown from issue, commits, and tests.")
+def pr_narrative_build(
+    issue: int | None = typer.Option(None, "--issue", help="Optional issue number to include in the narrative."),
+    from_ref: str = typer.Option("origin/main", "--from", help="Base ref for commit and diff collection."),
+    to_ref: str = typer.Option("HEAD", "--to", help="Head ref for commit and diff collection."),
+    tests_json: Path | None = typer.Option(None, "--tests-json", help="Path to JSON with test results."),
+    write: Path | None = typer.Option(None, "--write", help="Write generated markdown to this file."),
+    stdout: bool = typer.Option(True, "--stdout/--no-stdout", help="Print generated markdown to stdout."),
+) -> None:
+    issue_payload: dict[str, object] | None = None
+    if issue is not None:
+        config = load_config_or_exit()
+        client = forgejo_client(config)
+        raw_issue = client.get_issue(config.forgejo.owner, config.forgejo.repo, issue)
+        issue_payload = {
+            "number": raw_issue.get("number", raw_issue.get("index")),
+            "title": str(raw_issue.get("title", "")),
+            "body": str(raw_issue.get("body", "")),
+        }
+
+    commits = collect_commits(run_git, from_ref=from_ref, to_ref=to_ref)
+    changes = collect_changes(run_git, from_ref=from_ref, to_ref=to_ref)
+    tests = load_tests(tests_json)
+    markdown = build_narrative_markdown(issue=issue_payload, commits=commits, changes=changes, tests=tests)
+
+    if write is not None:
+        write.parent.mkdir(parents=True, exist_ok=True)
+        write.write_text(markdown, encoding="utf-8")
+        typer.echo(f"Wrote PR narrative to {write}")
+    if stdout:
+        typer.echo(markdown)
 
 
 @review_app.command("create", help="Post a review from JSON to the current branch's active PR.")
