@@ -1,1 +1,44 @@
+name: Publish
 
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get app token
+        id: app-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: >-
+            ["sams-claude-menagerie"]
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Skip if release already exists
+          if gh release view "$TAG" --repo ${{ github.repository }} &>/dev/null; then
+            echo "Release $TAG already exists, skipping"
+          else
+            gh release create "$TAG" \
+              --repo ${{ github.repository }} \
+              --title "$TAG" \
+              --generate-notes
+          fi
+
+      - name: Notify menagerie
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api repos/sam-phinizy/sams-claude-menagerie/dispatches \
+            --method POST \
+            --field event_type=plugin-published \
+            --field client_payload[plugin]="${{ github.event.repository.name }}" \
+            --field client_payload[tag]="${{ github.ref_name }}"
